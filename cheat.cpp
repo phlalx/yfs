@@ -1,0 +1,1 @@
+/home/vagrant/shared/contests/cheat.cpp

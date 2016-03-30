@@ -10,6 +10,7 @@
 #include "jsl_log.h"
 #include "gettime.h"
 #include "lang/verify.h"
+#include <unistd.h>
 
 #define NUM_CL 2
 

@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "lock_server.h"
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "jsl_log.h"
 

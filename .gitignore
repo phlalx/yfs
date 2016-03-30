@@ -1,2 +1,7 @@
 *.d
 *.o
+lock_demo
+lock_server
+lock_tester
+rpc/librpc.a
+rpc/rpctest

@@ -13,7 +13,7 @@ extern int JSL_DEBUG_LEVEL;
 
 #define jsl_log(level,...)                                    \
 	do {                                                        \
-		if(JSL_DEBUG_LEVEL < abs(level))			      							\
+		if(JSL_DEBUG_LEVEL < level)			      							\
 		{;}                                                       \
 		else {                                                    \
 			{ printf(__VA_ARGS__);}														\

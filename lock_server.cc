@@ -28,14 +28,13 @@ lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r)
   printf("acquire request from clt %d\n", clt);
 
   if (locks.find(lid) == locks.end()) {
-   	locks[lid] = lock_info();
+    locks[lid] = lock_info();
   } 
 
   lock_info &li = locks[lid];
 
-  if (li.is_locked) {
+  while (li.is_locked) {
     pthread_cond_wait(&li.waiting, &mutex);
-    assert(!li.is_locked);
   }
 
   li.is_locked = true;
@@ -56,7 +55,7 @@ lock_server::release(int clt, lock_protocol::lockid_t lid, int &r)
     lock_info &li = locks[lid];
     assert(li.is_locked);
     li.is_locked = false; 
-    printf("unlock %d\n", lid);
+    printf("unlock %llu\n", lid);
     pthread_cond_signal(&li.waiting);
   }
   pthread_mutex_unlock(&mutex);

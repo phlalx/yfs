@@ -18,7 +18,7 @@
 
 
 connection::connection(chanmgr *m1, int f1, int l1) 
-: mgr_(m1), fd_(f1), dead_(false),waiters_(0), refno_(1),lossy_(l1)
+: mgr_(m1), fd_(f1), dead_(false), waiters_(0), refno_(1),lossy_(l1)
 {
 
 	int flags = fcntl(fd_, F_GETFL, NULL);
@@ -31,7 +31,7 @@ connection::connection(chanmgr *m1, int f1, int l1)
 	VERIFY(pthread_cond_init(&send_wait_,0)==0);
 	VERIFY(pthread_cond_init(&send_complete_,0)==0);
  
-        VERIFY(gettimeofday(&create_time_, NULL) == 0); 
+    VERIFY(gettimeofday(&create_time_, NULL) == 0); 
 
 	PollMgr::Instance()->add_callback(fd_, CB_RDONLY, this);
 }
@@ -427,7 +427,7 @@ tcpsconn::accept_conn()
 connection *
 connect_to_dst(const sockaddr_in &dst, chanmgr *mgr, int lossy)
 {
-	int s= socket(AF_INET, SOCK_STREAM, 0);
+	int s = socket(AF_INET, SOCK_STREAM, 0);
 	int yes = 1;
 	setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes));
 	if(connect(s, (sockaddr*)&dst, sizeof(dst)) < 0) {

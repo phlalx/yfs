@@ -60,6 +60,19 @@
  x exited worker threads).
  */
 
+/*
+   Sliding window: 
+   In order to enforce at-most-once semantics, each RPC request contains:
+     an xid >= 1 
+     a client_nonce
+     a server_nonce
+     an xid_rep >= 0
+
+   (xid, client_nonce) uniquely identifies the request at the server
+   xid_rep acknowledge that the client received all reply for rpc with xid <= xid_rep
+   thus the server can safely forget about them
+*/
+
 #include "rpc.h"
 #include "method_thread.h"
 #include "slock.h"
@@ -188,11 +201,25 @@ rpcc::cancel(void)
   printf("rpcc::cancel: done\n");
 }
 
+// proc = remote proc id
+// req = data to send, already marshalled, but still metadata to be added  
+// rep = expected 
+// to = time out
 int
 rpcc::call1(unsigned int proc, marshall &req, unmarshall &rep, TO to)
 {
+	// creates a caller object that represents this particular call
 	caller ca(0, &rep);
+
 	int xid_rep;
+
+	// add meta data to request 
+	// .. proc, xid, clt_nonce, srv_nonce, xid_rep
+	// update request number (xid)
+	// memorize this caller in a global table
+	// xid = ? 
+	// xid_rep = ? 
+	// xid_rep_window = ?
 	{
 		ScopedLock ml(&m_);
 
@@ -209,45 +236,44 @@ rpcc::call1(unsigned int proc, marshall &req, unmarshall &rep, TO to)
 		ca.xid = xid_++;
 		calls_[ca.xid] = &ca;
 
-		req_header h(ca.xid, proc, clt_nonce_, srv_nonce_,
-			xid_rep_window_.front());
+		req_header h(ca.xid, proc, clt_nonce_, srv_nonce_, xid_rep_window_.front());
 
 		req.pack_req_header(h);
 		xid_rep = xid_rep_window_.front();
     }
 
-TO curr_to;
-struct timespec now, nextdeadline, finaldeadline; 
+    TO curr_to;
+    struct timespec now, nextdeadline, finaldeadline; 
 
-clock_gettime(CLOCK_REALTIME, &now);
-add_timespec(now, to.to, &finaldeadline); 
-curr_to.to = to_min.to;
+    clock_gettime(CLOCK_REALTIME, &now);
+    add_timespec(now, to.to, &finaldeadline); 
+    curr_to.to = to_min.to;
 
-bool transmit = true;
-connection *ch = NULL;
+    bool transmit = true;
+    connection *ch = NULL;
 
-while (1){
-	if(transmit){
-		get_refconn(&ch);
-		if(ch){
-			if(reachable_) {
-				request forgot;
-				{
-					ScopedLock ml(&m_);
-					if (dup_req_.isvalid() && xid_rep_done_ > dup_req_.xid) {
-						forgot = dup_req_;
-						dup_req_.clear();
-					}
-				}
-				if (forgot.isvalid()) 
-					ch->send((char *)forgot.buf.c_str(), forgot.buf.size());
-				ch->send(req.cstr(), req.size());
-			}
-			else jsl_log(JSL_DBG_1, "not reachable\n");
-			jsl_log(JSL_DBG_2, 
-				"rpcc::call1 %u just sent req proc %x xid %u clt_nonce %d\n", 
-				clt_nonce_, proc, ca.xid, clt_nonce_); 
-		}
+    while (1){
+    	if(transmit){
+    		get_refconn(&ch);
+    		if(ch){
+    			if(reachable_) {
+    				request forgot;
+    				{
+    					ScopedLock ml(&m_);
+    					if (dup_req_.isvalid() && xid_rep_done_ > dup_req_.xid) {
+    						forgot = dup_req_;
+    						dup_req_.clear();
+    					}
+    				}
+    				if (forgot.isvalid()) 
+    					ch->send((char *)forgot.buf.c_str(), forgot.buf.size());
+    				ch->send(req.cstr(), req.size());
+    			}
+    			else jsl_log(JSL_DBG_1, "not reachable\n");
+    			jsl_log(JSL_DBG_2, 
+    				"rpcc::call1 %u just sent req proc %x xid %u clt_nonce %d\n", 
+    				clt_nonce_, proc, ca.xid, clt_nonce_); 
+    		}
 			transmit = false; // only send once on a given channel
 		}
 
@@ -268,60 +294,60 @@ while (1){
 				if(pthread_cond_timedwait(&ca.c, &ca.m,
 					&nextdeadline) == ETIMEDOUT){
 					jsl_log(JSL_DBG_2, "rpcc::call1: timeout\n");
+					break;
+				}
+			}
+			if(ca.done){
+				jsl_log(JSL_DBG_2, "rpcc::call1: reply received\n");
 				break;
 			}
 		}
-		if(ca.done){
-			jsl_log(JSL_DBG_2, "rpcc::call1: reply received\n");
-			break;
-		}
-	}
 
-	if(retrans_ && (!ch || ch->isdead())){
+		if(retrans_ && (!ch || ch->isdead())){
 			// since connection is dead, retransmit
                         // on the new connection 
-		transmit = true; 
+			transmit = true; 
+		}
+		curr_to.to <<= 1;
 	}
-	curr_to.to <<= 1;
-}
 
-{ 
-                // no locking of ca.m since only this thread changes ca.xid 
-	ScopedLock ml(&m_);
-	calls_.erase(ca.xid);
+	{ 
+    // no locking of ca.m since only this thread changes ca.xid 
+		ScopedLock ml(&m_);
+		calls_.erase(ca.xid);
 		// may need to update the xid again here, in case the
 		// packet times out before it's even sent by the channel.
 		// I don't think there's any harm in maybe doing it twice
-	update_xid_rep(ca.xid);
+		update_xid_rep(ca.xid);
 
-	if(destroy_wait_){
-		VERIFY(pthread_cond_signal(&destroy_wait_c_) == 0);
+		if(destroy_wait_){
+			VERIFY(pthread_cond_signal(&destroy_wait_c_) == 0);
+		}
 	}
-}
 
-if (ca.done && lossytest_)
-{
-	ScopedLock ml(&m_);
-	if (!dup_req_.isvalid()) {
-		dup_req_.buf.assign(req.cstr(), req.size());
-		dup_req_.xid = ca.xid;
+	if (ca.done && lossytest_)
+	{
+		ScopedLock ml(&m_);
+		if (!dup_req_.isvalid()) {
+			dup_req_.buf.assign(req.cstr(), req.size());
+			dup_req_.xid = ca.xid;
+		}
+		if (xid_rep > xid_rep_done_)
+			xid_rep_done_ = xid_rep;
 	}
-	if (xid_rep > xid_rep_done_)
-		xid_rep_done_ = xid_rep;
-}
 
-ScopedLock cal(&ca.m);
+	ScopedLock cal(&ca.m);
 
-jsl_log(JSL_DBG_2, 
-	"rpcc::call1 %u call done for req proc %x xid %u %s:%d done? %d ret %d \n", 
-	clt_nonce_, proc, ca.xid, inet_ntoa(dst_.sin_addr),
-	ntohs(dst_.sin_port), ca.done, ca.intret);
+	jsl_log(JSL_DBG_2, 
+		"rpcc::call1 %u call done for req proc %x xid %u %s:%d done? %d ret %d \n", 
+		clt_nonce_, proc, ca.xid, inet_ntoa(dst_.sin_addr),
+		ntohs(dst_.sin_port), ca.done, ca.intret);
 
-if(ch)
-	ch->decref();
+	if(ch)
+		ch->decref();
 
 	// destruction of req automatically frees its buffer
-return (ca.done? ca.intret : rpc_const::timeout_failure);
+	return (ca.done? ca.intret : rpc_const::timeout_failure);
 }
 
 void
@@ -344,12 +370,13 @@ rpcc::get_refconn(connection **ch)
 
 // PollMgr's thread is being used to 
 // make this upcall from connection object to rpcc. 
-// this funtion must not block.
+// this function must not block.
 //
 // this function keeps no reference for connection *c 
 bool
 rpcc::got_pdu(connection *c, char *b, int sz)
 {
+	// unmarshall data
 	unmarshall rep(b, sz);
 	reply_header h;
 	rep.unpack_reply_header(&h);
@@ -361,14 +388,17 @@ rpcc::got_pdu(connection *c, char *b, int sz)
 
 	ScopedLock ml(&m_);
 
+	// update xid according to answer meta data
 	update_xid_rep(h.xid);
 
+	// retrieve caller for that request id, ignore if no pending request
 	if(calls_.find(h.xid) == calls_.end()){
 		jsl_log(JSL_DBG_2, "rpcc::got_pdu xid %d no pending request\n", h.xid);
 		return true;
 	}
 	caller *ca = calls_[h.xid];
 
+	// update caller object with received data
 	ScopedLock cl(&ca->m);
 	if(!ca->done){
 		ca->un->take_in(rep);
@@ -379,6 +409,7 @@ rpcc::got_pdu(connection *c, char *b, int sz)
 		}
 		ca->done = 1;
 	}
+	// signal waiting callers
 	VERIFY(pthread_cond_broadcast(&ca->c) == 0);
 	return true;
 }
@@ -444,10 +475,10 @@ rpcs::~rpcs()
 bool
 rpcs::got_pdu(connection *c, char *b, int sz)
 {
-        if(!reachable_){
-            jsl_log(JSL_DBG_1, "rpcss::got_pdu: not reachable\n");
-            return true;
-        }
+	if(!reachable_){
+		jsl_log(JSL_DBG_1, "rpcss::got_pdu: not reachable\n");
+		return true;
+	}
 
 	djob_t *j = new djob_t(c, b, sz);
 	c->incref();
@@ -577,8 +608,7 @@ rpcs::dispatch(djob_t *j)
 			}
 		}
 
-		stat = checkduplicate_and_update(h.clt_nonce, h.xid,
-                                                 h.xid_rep, &b1, &sz1);
+		stat = checkduplicate_and_update(h.clt_nonce, h.xid, h.xid_rep, &b1, &sz1);
 	} else {
 		// this client does not require at most once logic
 		stat = NEW;
@@ -663,8 +693,55 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
 {
 	ScopedLock rwl(&reply_window_m_);
+    // filled in for Lab 1.
+    VERIFY(xid_rep < xid);
+    VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
 
-        // You fill this in for Lab 1.
+    std::list<reply_t> &replies = reply_window_[clt_nonce];
+
+	if (replies.size() == 0) {
+		// the server hears from this client for the first time
+		reply_t r(xid); 
+		replies.push_back(r);
+		return NEW;
+	}
+
+	unsigned int first_xid = replies.front().xid; // ASSUME this list is sorted 
+
+	if (xid < first_xid) {
+		return FORGOTTEN;
+	}
+
+	// delete all xid in the reply_window <= xid_rep
+	// as they are confirmed by the client 
+
+	auto it = replies.begin();
+	while (it != replies.end() && it->xid <= xid_rep) {
+		it = replies.erase(it);
+	}
+
+	VERIFY(it == replies.begin());
+
+	while (it != replies.end() && it->xid < xid) {
+		it++;
+	}
+
+	if (it != replies.end() && it->xid == xid) {
+		reply_t &r = *it;
+		if (!r.cb_present) {
+			return INPROGRESS;
+		}
+
+		*b = r.buf;
+		*sz = r.sz;
+
+		return DONE;
+	}
+
+	reply_t r(xid); 
+	// add just before iterator
+	replies.emplace(--it, r);
+	
 	return NEW;
 }
 
@@ -678,7 +755,15 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 		char *b, int sz)
 {
 	ScopedLock rwl(&reply_window_m_);
-        // You fill this in for Lab 1.
+	std::list<reply_t> &replies = reply_window_[clt_nonce];
+	auto it = replies.begin();
+	while (it != replies.end() && it->xid != xid) {
+		it++;
+	}
+	VERIFY(it != replies.end());	
+	it->buf = b;
+	it->sz = sz;
+	it->cb_present = true;
 }
 
 void

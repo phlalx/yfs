@@ -74,6 +74,7 @@
 */
 
 #include "rpc.h"
+#include <algorithm>
 #include "method_thread.h"
 #include "slock.h"
 
@@ -571,7 +572,7 @@ rpcs::dispatch(djob_t *j)
 			fprintf(stderr, "rpcs::dispatch: unknown proc %x.\n",
 				proc);
 			c->decref();
-                        VERIFY(0);
+			VERIFY(0);
 			return;
 		}
 
@@ -589,6 +590,7 @@ rpcs::dispatch(djob_t *j)
 			// if we don't know about this clt_nonce, create a cleanup object
 			if(reply_window_.find(h.clt_nonce) == reply_window_.end()){
 				VERIFY (reply_window_[h.clt_nonce].size() == 0); // create
+				VERIFY (confirmed_ids_[h.clt_nonce] == 0); // create
 				jsl_log(JSL_DBG_2,
 						"rpcs::dispatch: new client %u xid %d chan %d, total clients %d\n", 
 						h.clt_nonce, h.xid, c->channo(), (int)reply_window_.size());
@@ -674,6 +676,14 @@ rpcs::dispatch(djob_t *j)
 	c->decref();
 }
 
+
+
+//void trim_window(std :: list<reply_t> &replies, unsigned int confirmed_id) {
+//	return;	
+//}
+
+
+
 // rpcs::dispatch calls this when an RPC request arrives.
 //
 // checks to see if an RPC with xid from clt_nonce has already been received.
@@ -692,56 +702,44 @@ rpcs::rpcstate_t
 rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
 {
+	jsl_log(JSL_DBG_2, "rpcc::checkduplicate_and_update cltn_nonce %d xid %d xid_rep %d\n", 
+			clt_nonce, xid, xid_rep); 
 	ScopedLock rwl(&reply_window_m_);
     // filled in for Lab 1.
     VERIFY(xid_rep < xid);
+    // window added to map when client is bound to server
     VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
 
     std::list<reply_t> &replies = reply_window_[clt_nonce];
+    unsigned int &confirmed_id = confirmed_ids_[clt_nonce];
+    confirmed_id = std :: max(confirmed_id, xid_rep);
 
-	if (replies.size() == 0) {
-		// the server hears from this client for the first time
-		reply_t r(xid); 
-		replies.push_back(r);
-		return NEW;
-	}
+    // TODO is there a way to factor those two lines in one?
+   	remove_if(replies.begin(), replies.end(), [&confirmed_id](const reply_t &arg) { return arg.xid <= confirmed_id; }); 
 
-	unsigned int first_xid = replies.front().xid; // ASSUME this list is sorted 
-
-	if (xid < first_xid) {
+    if (xid <= confirmed_id) {
+		jsl_log(JSL_DBG_2, "rpcc::checkduplicate_and_update - old request xid %d confirmed_id %d\n", xid, confirmed_id); 
 		return FORGOTTEN;
 	}
+    auto it = std :: find_if(replies.begin(), replies.end(), [&xid](const reply_t &arg) { return arg.xid == xid; }); 
 
-	// delete all xid in the reply_window <= xid_rep
-	// as they are confirmed by the client 
-
-	auto it = replies.begin();
-	while (it != replies.end() && it->xid <= xid_rep) {
-		it = replies.erase(it);
-	}
-
-	VERIFY(it == replies.begin());
-
-	while (it != replies.end() && it->xid < xid) {
-		it++;
-	}
-
-	if (it != replies.end() && it->xid == xid) {
+	if (it != replies.end()) {
 		reply_t &r = *it;
 		if (!r.cb_present) {
+			jsl_log(JSL_DBG_2, "rpcc::checkduplicate_and_update - IN PROGRESS xid %d confirmed_id %d\n", xid, confirmed_id); 
 			return INPROGRESS;
 		}
 
 		*b = r.buf;
 		*sz = r.sz;
 
+		jsl_log(JSL_DBG_2, "rpcc::checkduplicate_and_update - DONE xid %d confirmed_id %d\n", xid, confirmed_id); 
 		return DONE;
 	}
 
 	reply_t r(xid); 
-	// add just before iterator
-	replies.emplace(--it, r);
-	
+	replies.push_back(r);
+	jsl_log(JSL_DBG_2, "rpcc::checkduplicate_and_update - NEW xid %d confirmed_id %d\n", xid, confirmed_id); 
 	return NEW;
 }
 
@@ -754,6 +752,7 @@ void
 rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 		char *b, int sz)
 {
+	jsl_log(JSL_DBG_2, "rpcc::add_reply cltn_nonce %d xid %d\n", clt_nonce, xid); 
 	ScopedLock rwl(&reply_window_m_);
 	std::list<reply_t> &replies = reply_window_[clt_nonce];
 	auto it = replies.begin();
@@ -774,9 +773,9 @@ rpcs::free_reply_window(void)
 
 	ScopedLock rwl(&reply_window_m_);
 	for (clt = reply_window_.begin(); clt != reply_window_.end(); clt++){
-		for (it = clt->second.begin(); it != clt->second.end(); it++){
-			free((*it).buf);
-		}
+		// for (it = clt->second.begin(); it != clt->second.end(); it++){
+		// 	free((*it).buf);
+		// }
 		clt->second.clear();
 	}
 	reply_window_.clear();

@@ -7,12 +7,14 @@
 #include <iostream>
 #include <stdio.h>
 #include "tprintf.h"
+#include "jsl_log.h"
 
 
 lock_client_cache::lock_client_cache(std::string xdst, 
 				     class lock_release_user *_lu)
   : lock_client(xdst), lu(_lu)
 {
+  jsl_log(JSL_DBG_2, "calling constructor to lock_client_cache\n"); 
   rpcs *rlsrpc = new rpcs(0);
   rlsrpc->reg(rlock_protocol::revoke, this, &lock_client_cache::revoke_handler);
   rlsrpc->reg(rlock_protocol::retry, this, &lock_client_cache::retry_handler);
@@ -22,6 +24,7 @@ lock_client_cache::lock_client_cache(std::string xdst,
   std::ostringstream host;
   host << hname << ":" << rlsrpc->port();
   id = host.str();
+  jsl_log(JSL_DBG_2, "leaving constructor\n"); 
 }
 
 lock_protocol::status

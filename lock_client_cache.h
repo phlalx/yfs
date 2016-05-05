@@ -1,5 +1,4 @@
 // lock client interface.
-
 #ifndef lock_client_cache_h
 
 #define lock_client_cache_h
@@ -30,10 +29,8 @@ class lock_client_cache : public lock_client {
   virtual ~lock_client_cache() {};
   lock_protocol::status acquire(lock_protocol::lockid_t);
   lock_protocol::status release(lock_protocol::lockid_t);
-  rlock_protocol::status revoke_handler(lock_protocol::lockid_t, 
-                                        int &);
-  rlock_protocol::status retry_handler(lock_protocol::lockid_t, 
-                                       int &);
+  rlock_protocol::status revoke_handler(lock_protocol::lockid_t, int &);
+  rlock_protocol::status retry_handler(lock_protocol::lockid_t, int &);
 };
 
 

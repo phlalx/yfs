@@ -5,16 +5,16 @@ enum dbcode {
 	JSL_DBG_OFF = 0,
 	JSL_DBG_1 = 1, // Critical
 	JSL_DBG_2 = 2, // Error
-	JSL_DBG_3 = 3, // Info
-	JSL_DBG_4 = 4, // Debugging
-	JSL_DBG_ME = 16, // Debugging
+	JSL_DBG_3 = 4, // Info
+	JSL_DBG_4 = 8, // Debugging
+	JSL_DBG_ME = 16 // My own log
 };
 
 extern int JSL_DEBUG_LEVEL;
 
 #define jsl_log(level,...)                                    \
 	do {                                                        \
-		if(JSL_DEBUG_LEVEL < level)			      							\
+		if(!(JSL_DEBUG_LEVEL & level))			      							\
 		{;}                                                       \
 		else {                                                    \
 			{ printf(__VA_ARGS__);}														\

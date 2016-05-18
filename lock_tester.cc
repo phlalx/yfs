@@ -158,7 +158,7 @@ main(int argc, char *argv[])
     setvbuf(stderr, NULL, _IONBF, 0);
     srandom(getpid());
 
-    jsl_set_debug(2);
+    jsl_set_debug(JSL_DBG_ME);
 
     if(argc < 2) {
       fprintf(stderr, "Usage: %s [host:]port [test]\n", argv[0]);
@@ -176,7 +176,6 @@ main(int argc, char *argv[])
     }
 
     VERIFY(pthread_mutex_init(&count_mutex, NULL) == 0);
-    jsl_log(JSL_DBG_2, " -- cache lock client\n");
     for (int i = 0; i < nt; i++) {
       lc[i] = new lock_client_cache(dst);
     }
@@ -185,17 +184,17 @@ main(int argc, char *argv[])
       test1();
     }
 
-    if(!test || test == 2){
+    if(!test || test == 2) {
       // test2
       for (int i = 0; i < nt; i++) {
-	int *a = new int (i);
-	r = pthread_create(&th[i], NULL, test2, (void *) a);
-	VERIFY (r == 0);
-      }
-      for (int i = 0; i < nt; i++) {
-	pthread_join(th[i], NULL);
-      }
-    }
+       int *a = new int (i);
+       r = pthread_create(&th[i], NULL, test2, (void *) a);
+       VERIFY (r == 0);
+     }
+     for (int i = 0; i < nt; i++) {
+       pthread_join(th[i], NULL);
+     }
+   }
 
     if(!test || test == 3){
       printf("test 3\n");

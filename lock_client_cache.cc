@@ -9,6 +9,30 @@
 #include "tprintf.h"
 #include "jsl_log.h"
 
+const char * 
+lock_client_cache::lock_info::to_string() {
+  switch(st){
+    case ACQUIRING: return "ACQUIRING";
+    case RELEASING: return "RELEASING";
+    case FREE: return "FREE";
+    case NONE: return "NONE";
+    case LOCKED: return "LOCKED";
+  }
+  return "--";
+}
+
+void 
+lock_client_cache::lock_info::set(lock_client_cache *lcc, lock_protocol::lockid_t lid, State new_st) {
+    jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: ", lcc->id.c_str(), pthread_self(), lid);
+    jsl_log(JSL_DBG_ME, "%s -> ", to_string());
+    st = new_st;
+    jsl_log(JSL_DBG_ME, "%s (# = %d)\n", to_string(), number_waiting);
+    if (st == FREE || st == NONE) {
+      is_revoked = false; 
+      is_retried = false; 
+    }
+}
+
 lock_client_cache::lock_client_cache(std::string xdst, 
 				     class lock_release_user *_lu)
   : lock_client(xdst), lu(_lu)
@@ -33,16 +57,15 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
     jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: acquire\n", id.c_str(), pthread_self(), lid);
     lock_info &li = locks[lid];
 
+    while (li.st == ACQUIRING || li.st == RELEASING || li.st == LOCKED) {
+      pthread_cond_wait(&li.waiting_local, &mutex);
+    }
+
     if (li.st == FREE) {
       li.set(this, lid, LOCKED);
       return ret;
     }
-
-    if (li.st != NONE) {
-    // For now, suppose there's only one client thread
-    // meaning li.st == NONE or FREE
-      VERIFY(0);
-    }
+    VERIFY(li.st == NONE);
     li.set(this, lid, ACQUIRING);
   }
 
@@ -83,6 +106,9 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
     ScopedLock ml(&mutex); 
     jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: release\n", id.c_str(), pthread_self(), lid);
     lock_info &li = locks[lid];
+
+    pthread_cond_signal(&li.waiting_local); // not always necessary
+
     if (li.st == LOCKED) { 
       li.set(this, lid, FREE); 
       return ret;

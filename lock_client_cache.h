@@ -22,18 +22,19 @@ class lock_release_user {
 class lock_client_cache : public lock_client {
 private:
 
-  enum State { ACQUIRING, RELEASING, FREE, NONE, LOCKED, ACQUIRING_RELEASING };
+  enum State { ACQUIRING, RELEASING, FREE, NONE, LOCKED };
   struct lock_info {
 
     State st;
     pthread_cond_t waiting_from_server;  // acquire thread
     pthread_cond_t waiting_local;      // client thread
+
     bool is_revoked;
+    bool is_retried;
 
     const char *to_string() {
       switch(st){
         case ACQUIRING: return "ACQUIRING";
-        case ACQUIRING_RELEASING: return "ACQUIRING_RELEASING";
         case RELEASING: return "RELEASING";
         case FREE: return "FREE";
         case NONE: return "NONE";
@@ -49,6 +50,7 @@ private:
         jsl_log(JSL_DBG_ME, "%s (# = %d)\n", to_string(), number_waiting);
         if (st == FREE || st == NONE) {
           is_revoked = false; 
+          is_retried = false; 
         }
     }
 
@@ -60,6 +62,7 @@ private:
       waiting_from_server = PTHREAD_COND_INITIALIZER; 
       waiting_local = PTHREAD_COND_INITIALIZER; 
       is_revoked = false;
+      is_retried = false;
     };
   };
 

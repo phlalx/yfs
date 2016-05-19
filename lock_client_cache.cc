@@ -52,7 +52,6 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
 
   { 
     ScopedLock ml(&mutex);
-    jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: acquire\n", id.c_str(), pthread_self(), lid);
     lock_info &li = locks[lid];
 
     if (acquire_ret == lock_protocol::OK) {
@@ -65,13 +64,9 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
     jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: server.acquire -> RETRY\n", id.c_str(), pthread_self(), lid);
     VERIFY(acquire_ret == lock_protocol::RETRY);
 
-    if (li.is_retried) {
-      li.set(this, lid, li.is_revoked?RELEASING:LOCKED);
-      return ret;
+    while (!li.is_retried) {
+      pthread_cond_wait(&li.waiting_retry, &mutex);
     }
-
-    // waiting for retry
-    pthread_cond_wait(&li.waiting_local, &mutex);
 
     jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: woken up by retry rpc\n", id.c_str(), pthread_self(), lid);
 
@@ -118,7 +113,7 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid, int &)
       li.set(this, lid, RELEASING);
     } else if (li.st == ACQUIRING) {
       //
-    } else {
+    } else { // NONE or RELEASING 
       VERIFY(0);
     }
   }
@@ -138,7 +133,7 @@ lock_client_cache::retry_handler(lock_protocol::lockid_t lid, int &)
   lock_info &li = locks[lid];
   li.is_retried = true;
   VERIFY(li.st == ACQUIRING);
-  pthread_cond_signal(&li.waiting_local); // not always necessary
+  pthread_cond_signal(&li.waiting_retry); // not always necessary
   int ret = rlock_protocol::OK;
   return ret;
 }

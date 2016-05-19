@@ -27,7 +27,7 @@ private:
 
     State st;
     pthread_cond_t waiting_from_server;  // acquire thread
-    pthread_cond_t waiting_local;      // client thread
+    pthread_cond_t waiting_retry;      // client thread
 
     bool is_revoked;
     bool is_retried;
@@ -60,7 +60,7 @@ private:
       number_waiting = 0;
       st = NONE;
       waiting_from_server = PTHREAD_COND_INITIALIZER; 
-      waiting_local = PTHREAD_COND_INITIALIZER; 
+      waiting_retry = PTHREAD_COND_INITIALIZER; 
       is_revoked = false;
       is_retried = false;
     };

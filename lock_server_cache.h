@@ -17,11 +17,12 @@ class lock_server_cache {
   struct lock_info {
   	bool is_locked;
   	std::string id;
+  	// TODO should use some FIFO structure instead to ensure fairness
   	std::set<std::string> waiting;
 
   	lock_info() {
   		is_locked = false; // redundant? TODO
-  		id = "";
+  		id = ""; // TODO
   	};
   };
 

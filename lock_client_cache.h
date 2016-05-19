@@ -26,40 +26,21 @@ private:
   struct lock_info {
 
     State st;
-    pthread_cond_t waiting_from_server;  // acquire thread
+    pthread_cond_t waiting_local;  // acquire thread
     pthread_cond_t waiting_retry;      // client thread
 
     bool is_revoked;
     bool is_retried;
 
-    const char *to_string() {
-      switch(st){
-        case ACQUIRING: return "ACQUIRING";
-        case RELEASING: return "RELEASING";
-        case FREE: return "FREE";
-        case NONE: return "NONE";
-        case LOCKED: return "LOCKED";
-      }
-      return "--";
-    }
-
-    void set(lock_client_cache *lcc, lock_protocol::lockid_t lid, State new_st) {
-        jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: ", lcc->id.c_str(), pthread_self(), lid);
-        jsl_log(JSL_DBG_ME, "%s -> ", to_string());
-        st = new_st;
-        jsl_log(JSL_DBG_ME, "%s (# = %d)\n", to_string(), number_waiting);
-        if (st == FREE || st == NONE) {
-          is_revoked = false; 
-          is_retried = false; 
-        }
-    }
-
     int number_waiting;
 
+    const char * to_string();
+    void set(lock_client_cache *lcc, lock_protocol::lockid_t lid, State new_st);
+ 
     lock_info() {
       number_waiting = 0;
       st = NONE;
-      waiting_from_server = PTHREAD_COND_INITIALIZER; 
+      waiting_local = PTHREAD_COND_INITIALIZER; 
       waiting_retry = PTHREAD_COND_INITIALIZER; 
       is_revoked = false;
       is_retried = false;

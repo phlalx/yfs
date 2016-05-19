@@ -55,7 +55,7 @@ class rpcc : public chanmgr {
 		unsigned int clt_nonce_;
 		unsigned int srv_nonce_;
 		bool bind_done_;
-		unsigned int xid_;
+		unsigned int xid_; // global request id
 		int lossytest_;
 		bool retrans_;
 		bool reachable_;
@@ -285,6 +285,9 @@ class rpcs : public chanmgr {
 			buf = NULL;
 			sz = 0;
 		}
+		~reply_t() {
+			free(buf);
+		}
 		unsigned int xid;
 		bool cb_present; // whether the reply buffer is valid
 		char *buf;      // the reply buffer
@@ -296,8 +299,10 @@ class rpcs : public chanmgr {
 
 	// provide at most once semantics by maintaining a window of replies
 	// per client that that client hasn't acknowledged receiving yet.
-        // indexed by client nonce.
+    // indexed by client nonce.
 	std::map<unsigned int, std::list<reply_t> > reply_window_;
+	// all xid <= confirmed_id are confirmed by the client
+	std::map<unsigned int, unsigned int> confirmed_ids_;
 
 	void free_reply_window(void);
 	void add_reply(unsigned int clt_nonce, unsigned int xid, char *b, int sz);

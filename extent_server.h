@@ -9,6 +9,15 @@
 
 class extent_server {
 
+  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+  struct value {
+  	extent_protocol::attr attributes;
+  	std::string data;
+  };
+
+  std::map<extent_protocol::extentid_t, value> kv_store; 
+
  public:
   extent_server();
 

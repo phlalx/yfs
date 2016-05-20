@@ -6,10 +6,11 @@
 #include "extent_client.h"
 #include <vector>
 
-
 class yfs_client {
+
   extent_client *ec;
- public:
+
+public:
 
   typedef unsigned long long inum;
   enum xxstatus { OK, RPCERR, NOENT, IOERR, EXIST };
@@ -31,10 +32,12 @@ class yfs_client {
     yfs_client::inum inum;
   };
 
- private:
+private:
+  
   static std::string filename(inum);
   static inum n2i(std::string);
- public:
+
+public:
 
   yfs_client(std::string, std::string);
 

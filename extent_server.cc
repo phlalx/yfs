@@ -10,21 +10,22 @@
 
 extent_server::extent_server() {}
 
-
 int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
-{
-  // You fill this in for Lab 2.
-  return extent_protocol::IOERR;
+{ 
+  ScopedLock mut(&mutex);
+  return extent_protocol::OK;
 }
 
 int extent_server::get(extent_protocol::extentid_t id, std::string &buf)
 {
+  ScopedLock mut(&mutex);
   // You fill this in for Lab 2.
   return extent_protocol::IOERR;
 }
 
 int extent_server::getattr(extent_protocol::extentid_t id, extent_protocol::attr &a)
 {
+  ScopedLock mut(&mutex);
   // You fill this in for Lab 2.
   // You replace this with a real implementation. We send a phony response
   // for now because it's difficult to get FUSE to do anything (including
@@ -38,6 +39,7 @@ int extent_server::getattr(extent_protocol::extentid_t id, extent_protocol::attr
 
 int extent_server::remove(extent_protocol::extentid_t id, int &)
 {
+  ScopedLock mut(&mutex);
   // You fill this in for Lab 2.
   return extent_protocol::IOERR;
 }

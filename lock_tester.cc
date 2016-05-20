@@ -3,7 +3,7 @@
 //
 
 #include "lock_protocol.h"
-#include "lock_client.h"
+//#include "lock_client.h"
 #include "rpc.h"
 #include "jsl_log.h"
 #include <arpa/inet.h>
@@ -13,11 +13,14 @@
 #include "lang/verify.h"
 #include <sys/types.h>
 #include <unistd.h>
+#include "lock_client_cache.h"
 
 // must be >= 2
-int nt = 6; //XXX: lab1's rpc handlers are blocking. Since rpcs uses a thread pool of 10 threads, we cannot test more than 10 blocking rpc.
+// XXX: lab1's rpc handlers are blocking. 
+// Since rpcs uses a thread pool of 10 threads, we cannot test more than 10 blocking rpc.
+int nt = 6; 
 std::string dst;
-lock_client **lc = new lock_client * [nt];
+lock_client_cache **lc = new lock_client_cache * [nt];
 lock_protocol::lockid_t a = 1;
 lock_protocol::lockid_t b = 2;
 lock_protocol::lockid_t c = 3;
@@ -155,7 +158,7 @@ main(int argc, char *argv[])
     setvbuf(stderr, NULL, _IONBF, 0);
     srandom(getpid());
 
-    //jsl_set_debug(2);
+    jsl_set_debug(JSL_DBG_ME);
 
     if(argc < 2) {
       fprintf(stderr, "Usage: %s [host:]port [test]\n", argv[0]);
@@ -173,24 +176,25 @@ main(int argc, char *argv[])
     }
 
     VERIFY(pthread_mutex_init(&count_mutex, NULL) == 0);
-    printf("simple lock client\n");
-    for (int i = 0; i < nt; i++) lc[i] = new lock_client(dst);
+    for (int i = 0; i < nt; i++) {
+      lc[i] = new lock_client_cache(dst);
+    }
 
     if(!test || test == 1){
       test1();
     }
 
-    if(!test || test == 2){
+    if(!test || test == 2) {
       // test2
       for (int i = 0; i < nt; i++) {
-	int *a = new int (i);
-	r = pthread_create(&th[i], NULL, test2, (void *) a);
-	VERIFY (r == 0);
-      }
-      for (int i = 0; i < nt; i++) {
-	pthread_join(th[i], NULL);
-      }
-    }
+       int *a = new int (i);
+       r = pthread_create(&th[i], NULL, test2, (void *) a);
+       VERIFY (r == 0);
+     }
+     for (int i = 0; i < nt; i++) {
+       pthread_join(th[i], NULL);
+     }
+   }
 
     if(!test || test == 3){
       printf("test 3\n");

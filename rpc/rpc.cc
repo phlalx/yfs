@@ -462,6 +462,7 @@ rpcs::rpcs(unsigned int p1, int count)
 	reg(rpc_const::bind, this, &rpcs::rpcbind);
 	dispatchpool_ = new ThrPool(6,false);
 
+	jsl_log(JSL_DBG_2, "setting up connection=%d\n", port_); 
 	listener_ = new tcpsconn(this, port_, lossytest_);
 }
 

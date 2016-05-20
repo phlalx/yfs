@@ -1,6 +1,7 @@
 #include "rpc.h"
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <unistd.h>
 #include "extent_server.h"

@@ -7,40 +7,57 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <jsl_log.h>
 
 extent_server::extent_server() {}
 
 int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
 { 
   ScopedLock mut(&mutex);
+  jsl_log(JSL_DBG_ME, "extent_server: put %llu\n", id);
+  Value &v = kv_store[id];
+  v.buf = buf;
+  v.attr.size = buf.size();
+  time_t cur_time = time(NULL);
+  if (v.attr.ctime == 0) {
+    // TODO why not set access time so it's not zero right after creation?
+    v.attr.ctime = cur_time;
+  }
+  v.attr.mtime = cur_time;
   return extent_protocol::OK;
 }
 
 int extent_server::get(extent_protocol::extentid_t id, std::string &buf)
 {
   ScopedLock mut(&mutex);
-  // You fill this in for Lab 2.
-  return extent_protocol::IOERR;
+  jsl_log(JSL_DBG_ME, "extent_server: get %llu\n", id);
+  if (kv_store.find(id) == kv_store.end()) {
+    return extent_protocol::NOENT;
+  }
+  Value &v = kv_store[id];
+  buf = v.buf;
+  v.attr.atime = time(NULL);
+  return extent_protocol::OK;
 }
 
 int extent_server::getattr(extent_protocol::extentid_t id, extent_protocol::attr &a)
 {
   ScopedLock mut(&mutex);
-  // You fill this in for Lab 2.
-  // You replace this with a real implementation. We send a phony response
-  // for now because it's difficult to get FUSE to do anything (including
-  // unmount) if getattr fails.
-  a.size = 0;
-  a.atime = 0;
-  a.mtime = 0;
-  a.ctime = 0;
+  jsl_log(JSL_DBG_ME, "extent_server: get attr %llu\n", id);
+  if (kv_store.find(id) == kv_store.end()) {
+    return extent_protocol::NOENT;
+  }
+  a = kv_store[id].attr;
   return extent_protocol::OK;
 }
 
 int extent_server::remove(extent_protocol::extentid_t id, int &)
 {
   ScopedLock mut(&mutex);
-  // You fill this in for Lab 2.
-  return extent_protocol::IOERR;
+  jsl_log(JSL_DBG_ME, "extent_server: remove %llu\n", id);
+  if (kv_store.find(id) == kv_store.end()) {
+    return extent_protocol::NOENT;
+  }
+  kv_store.erase(id);
+  return extent_protocol::OK;
 }
-

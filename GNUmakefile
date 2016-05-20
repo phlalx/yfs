@@ -1,4 +1,4 @@
-LAB=2
+LAB=4
 SOL=0
 RPC=./rpc
 LAB2GE=$(shell expr $(LAB) \>\= 2)

@@ -22,7 +22,9 @@ class extent_protocol {
     unsigned int mtime;
     unsigned int ctime;
     unsigned int size;
+    attr() : atime(0), mtime(0), ctime(0), size(0) { }
   };
+
 };
 
 inline unmarshall &

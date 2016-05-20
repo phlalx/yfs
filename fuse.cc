@@ -15,9 +15,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <map>
 #include "lang/verify.h"
 #include "yfs_client.h"
+#include "jsl_log.h"
 
+// TODO quel est le status de cette variable ?
 int myid;
 yfs_client *yfs;
 
@@ -45,7 +48,7 @@ getattr(yfs_client::inum inum, struct stat &st)
   bzero(&st, sizeof(st));
 
   st.st_ino = inum;
-  printf("getattr %016llx %d\n", inum, yfs->isfile(inum));
+  jsl_log(JSL_DBG_ME, "fuse getattr %016llx %d\n", inum, yfs->isfile(inum));
   if(yfs->isfile(inum)){
      yfs_client::fileinfo info;
      ret = yfs->getfile(inum, info);
@@ -57,7 +60,7 @@ getattr(yfs_client::inum inum, struct stat &st)
      st.st_mtime = info.mtime;
      st.st_ctime = info.ctime;
      st.st_size = info.size;
-     printf("   getattr -> %llu\n", info.size);
+     jsl_log(JSL_DBG_ME, " getattr -> %llu\n", info.size);
    } else {
      yfs_client::dirinfo info;
      ret = yfs->getdir(inum, info);
@@ -68,7 +71,7 @@ getattr(yfs_client::inum inum, struct stat &st)
      st.st_atime = info.atime;
      st.st_mtime = info.mtime;
      st.st_ctime = info.ctime;
-     printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
+     jsl_log(JSL_DBG_ME, " getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
    }
    return yfs_client::OK;
 }
@@ -211,6 +214,7 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
 //
 // @return yfs_client::OK on success, and EXIST if @name already exists.
 //
+// TODO: ne pas plutot mettre ça dans yfs ? ou alors mes fonctions ici ?
 yfs_client::status
 fuseserver_createhelper(fuse_ino_t parent, const char *name,
                         mode_t mode, struct fuse_entry_param *e)
@@ -219,14 +223,23 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
   e->attr_timeout = 0.0;
   e->entry_timeout = 0.0;
   e->generation = 0;
-  // You fill this in for Lab 2
-  return yfs_client::NOENT;
+
+  yfs_client::inum file_inum = 0;
+  int st = yfs->create(parent, name, file_inum);
+  if (st < 0) {
+    return yfs_client::EXIST;
+  }
+  e->ino = file_inum;
+  getattr(file_inum, e->attr);
+
+  return yfs_client::OK;
 }
 
 void
 fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
                   mode_t mode, struct fuse_file_info *fi)
 {
+  jsl_log(JSL_DBG_ME, "fuse fuseserver_create %016lx %s\n", parent, name);
   struct fuse_entry_param e;
   yfs_client::status ret;
   if( (ret = fuseserver_createhelper( parent, name, mode, &e )) == yfs_client::OK ) {
@@ -263,6 +276,7 @@ void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent,
 void
 fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
+  jsl_log(JSL_DBG_ME, "fuse fuseserver_lookup %016lx %s\n", parent, name);
   struct fuse_entry_param e;
   // In yfs, timeouts are always set to 0.0, and generations are always set to 0
   e.attr_timeout = 0.0;
@@ -270,11 +284,19 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
   e.generation = 0;
   bool found = false;
 
-  // You fill this in for Lab 2
-  if (found)
+  yfs_client::inum file_inum = 0L;
+  found = yfs->lookup(parent, name, file_inum);
+
+  e.ino = file_inum;
+
+  if (found) {
+    yfs_client::status st = getattr(file_inum, e.attr); 
+    VERIFY(st == yfs_client::OK);
     fuse_reply_entry(req, &e);
-  else
+  }
+  else {
     fuse_reply_err(req, ENOENT);
+  }
 }
 
 
@@ -321,18 +343,19 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   yfs_client::inum inum = ino; // req->in.h.nodeid;
   struct dirbuf b;
 
-  printf("fuseserver_readdir\n");
-
   if(!yfs->isdir(inum)){
     fuse_reply_err(req, ENOTDIR);
     return;
   }
 
+  std::vector<yfs_client::dirent> v;
+  yfs->read_dir(ino, v);
+
   memset(&b, 0, sizeof(b));
 
-
-  // You fill this in for Lab 2
-
+  for (auto const &de : v) {
+    dirbuf_add(&b, de.name.c_str(), de.inum);
+  }
 
   reply_buf_limited(req, b.p, b.size, off, size);
   free(b.p);
@@ -413,6 +436,7 @@ struct fuse_lowlevel_ops fuseserver_oper;
 int
 main(int argc, char *argv[])
 {
+  jsl_set_debug(JSL_DBG_ME);
   char *mountpoint = 0;
   int err = -1;
   int fd;

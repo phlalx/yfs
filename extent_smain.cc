@@ -2,13 +2,16 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "extent_server.h"
+#include "jsl_log.h"
 
 // Main loop of extent server
 
 int
 main(int argc, char *argv[])
 {
+  jsl_set_debug(JSL_DBG_ME);
   int count = 0;
 
   if(argc != 2){

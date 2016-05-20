@@ -5,11 +5,14 @@
 //#include "yfs_protocol.h"
 #include "extent_client.h"
 #include <vector>
-
+#include "lock_protocol.h"
+#include "lock_client.h"
 
 class yfs_client {
+
   extent_client *ec;
- public:
+
+public:
 
   typedef unsigned long long inum;
   enum xxstatus { OK, RPCERR, NOENT, IOERR, EXIST };
@@ -21,20 +24,28 @@ class yfs_client {
     unsigned long mtime;
     unsigned long ctime;
   };
+
   struct dirinfo {
     unsigned long atime;
     unsigned long mtime;
     unsigned long ctime;
   };
+
   struct dirent {
     std::string name;
     yfs_client::inum inum;
+    dirent(std::string name, yfs_client::inum inum) : name(name), inum(inum) {}
   };
 
- private:
+private:
+  
   static std::string filename(inum);
   static inum n2i(std::string);
- public:
+  static std::string serialize_dir(std::vector<dirent>);
+  static void deserialize_dir(std::string, std::vector<dirent> &);
+  static inum fresh_inum(bool is_dir);
+
+public:
 
   yfs_client(std::string, std::string);
 
@@ -43,6 +54,24 @@ class yfs_client {
 
   int getfile(inum, fileinfo &);
   int getdir(inum, dirinfo &);
+
+
+  // TODO supprimer les VERIFY qui feront planter le programme et utiliser 
+  // les codes de retour dédiés (cf. get attr dans fuse.cc)
+  // TODO mettre ces méthodes dans FUSE.cc  ?
+
+  // precondition: parent is a dir
+  // -1 if name already exists
+  int create(inum parent, const char *name, inum &file_inum);
+
+  // precondition: parent is a dir
+  // we don't know if name is a dir or a file, so we use a file info
+  // to retrieve the attributes 
+  bool lookup(inum parent, const char *name, inum &file_inum);
+
+  // precondition: parent is a dir, and it exists
+  void read_dir(inum parent, std::vector<dirent> &v);
+
 };
 
 #endif 

@@ -15,9 +15,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <map>
 #include "lang/verify.h"
 #include "yfs_client.h"
+#include "jsl_log.h"
 
+// TODO quel est le status de cette variable ?
 int myid;
 yfs_client *yfs;
 
@@ -211,6 +214,7 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
 //
 // @return yfs_client::OK on success, and EXIST if @name already exists.
 //
+// TODO: ne pas plutot mettre ça dans yfs ? ou alors mes fonctions ici ?
 yfs_client::status
 fuseserver_createhelper(fuse_ino_t parent, const char *name,
                         mode_t mode, struct fuse_entry_param *e)
@@ -219,8 +223,16 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
   e->attr_timeout = 0.0;
   e->entry_timeout = 0.0;
   e->generation = 0;
-  // You fill this in for Lab 2
-  return yfs_client::NOENT;
+
+  yfs_client::inum file_inum;
+  int st = yfs->create(parent, name, file_inum);
+  if (st < 0) {
+    return yfs_client::EXIST;
+  }
+  e->ino = file_inum;
+  getattr(file_inum, e->attr);
+
+  return yfs_client::OK;
 }
 
 void
@@ -270,7 +282,14 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
   e.generation = 0;
   bool found = false;
 
-  // You fill this in for Lab 2
+  yfs_client::inum file_inum;
+  found = yfs->lookup(parent, name, file_inum);
+
+  e.ino = file_inum;
+
+  yfs_client::status st = getattr(file_inum, e.attr);
+  VERIFY(st == yfs_client::OK);
+
   if (found)
     fuse_reply_entry(req, &e);
   else
@@ -321,18 +340,19 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   yfs_client::inum inum = ino; // req->in.h.nodeid;
   struct dirbuf b;
 
-  printf("fuseserver_readdir\n");
-
   if(!yfs->isdir(inum)){
     fuse_reply_err(req, ENOTDIR);
     return;
   }
 
+  std::vector<yfs_client::dirent> v;
+  yfs->read_dir(ino, v);
+
   memset(&b, 0, sizeof(b));
 
-
-  // You fill this in for Lab 2
-
+  for (auto const &de : v) {
+    dirbuf_add(&b, de.name.c_str(), de.inum);
+  }
 
   reply_buf_limited(req, b.p, b.size, off, size);
   free(b.p);
@@ -413,6 +433,7 @@ struct fuse_lowlevel_ops fuseserver_oper;
 int
 main(int argc, char *argv[])
 {
+  jsl_set_debug(JSL_DBG_ME);
   char *mountpoint = 0;
   int err = -1;
   int fd;

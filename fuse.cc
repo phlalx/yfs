@@ -104,6 +104,7 @@ fuseserver_getattr(fuse_req_t req, fuse_ino_t ino,
       fuse_reply_err(req, ENOENT);
       return;
     }
+    // TODO pas bon 
     fuse_reply_attr(req, &st, 0);
 }
 
@@ -124,18 +125,17 @@ void
 fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
                    int to_set, struct fuse_file_info *fi)
 {
-  printf("fuseserver_setattr 0x%x\n", to_set);
+  jsl_log(JSL_DBG_ME, "fuseserver_setattr 0x%x\n", to_set);
   if (FUSE_SET_ATTR_SIZE & to_set) {
-    printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
+    jsl_log(JSL_DBG_ME, "   fuseserver_setattr set size to %zu\n", attr->st_size);
     struct stat st;
-    // You fill this in for Lab 2
-#if 0
-    // Change the above line to "#if 1", and your code goes here
-    // Note: fill st using getattr before fuse_reply_attr
-    fuse_reply_attr(req, &st, 0);
-#else
-    fuse_reply_err(req, ENOSYS);
-#endif
+    if (((yfs->resize(ino, attr->st_size)) == yfs_client::OK) &&
+        (getattr(ino, st) == yfs_client::OK)) {
+      // TODO, c'est pas bon ça !
+      fuse_reply_attr(req, &st, 0);
+    } else {
+      fuse_reply_err(req, ENOSYS);
+    }
   } else {
     fuse_reply_err(req, ENOSYS);
   }
@@ -157,14 +157,16 @@ void
 fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
                 off_t off, struct fuse_file_info *fi)
 {
-  // You fill this in for Lab 2
-#if 0
   std::string buf;
-  // Change the above "#if 0" to "#if 1", and your code goes here
-  fuse_reply_buf(req, buf.data(), buf.size());
-#else
-  fuse_reply_err(req, ENOSYS);
-#endif
+
+  yfs_client::status st = yfs->read(ino, size, off, buf);
+
+  if (st == yfs_client::OK) {
+    fuse_reply_buf(req, buf.data(), buf.size());
+  } else {
+    fuse_reply_err(req, ENOSYS);
+  }
+  return;
 }
 
 //
@@ -187,13 +189,15 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
                  const char *buf, size_t size, off_t off,
                  struct fuse_file_info *fi)
 {
-  // You fill this in for Lab 2
-#if 0
-  // Change the above line to "#if 1", and your code goes here
-  fuse_reply_write(req, size);
-#else
-  fuse_reply_err(req, ENOSYS);
-#endif
+  size_t bytes_written;
+  yfs_client::status st = yfs->write(ino, size, off, buf);
+
+  if (st == yfs_client::OK) {
+    fuse_reply_write(req, size);
+  } else {
+    fuse_reply_err(req, ENOSYS);
+  }
+  return;
 }
 
 //

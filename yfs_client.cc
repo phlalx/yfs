@@ -90,10 +90,58 @@ void yfs_client::read_dir(inum parent, std::vector<dirent> &v) {
  deserialize_dir(buf, v);
 }
 
+yfs_client::status yfs_client::read(inum num, size_t size, off_t off, std::string &buf) {
+  jsl_log(JSL_DBG_ME, "yfs_client_read %016llx size %lu off %lu\n", num, size, off);
+  std::string extent;
+  VERIFY(ec->get(num, extent) == extent_protocol::OK);
+  size_t extent_size = extent.size();
+  if ((size_t)off >= extent_size) { // TODO est-ce utile ? voir comportement par defaut de substr
+    buf = "";
+    return OK;
+  }
+  buf = extent.substr(off, extent_size); 
+  return OK;
+}
+
+yfs_client::status yfs_client::write(inum num, size_t size, off_t off, const char *buf) {
+  jsl_log(JSL_DBG_ME, "yfs_client_write %016llx\n", num);
+  std::string extent;
+  if (size == 0) {
+    return OK;
+  }
+  VERIFY(ec->get(num, extent) == extent_protocol::OK);
+  size_t old_size = extent.size();
+  size_t new_size = std::max(old_size, off + size); 
+  jsl_log(JSL_DBG_ME, "yfs_client_write %016llx - size %lu - old size %lu - new size - %lu - offset %lu\n", num, size, old_size, new_size, off);
+  extent.resize(new_size, 0);
+  VERIFY(extent.size() == new_size);
+  if ((size_t)off > old_size) {
+    jsl_log(JSL_DBG_ME, "yfs_client_write %016llx - there's a hole %lu\n", num, off - old_size);
+  }
+
+  // TODO replace this with a string method
+  for (size_t i = 0; i < size; i++){
+    extent[(size_t)(off + i)] = buf[i];
+  }
+
+  // update extent
+  VERIFY(ec->put(num, extent) == extent_protocol::OK);
+  return OK;
+}
+
+yfs_client::status yfs_client::resize(inum num, size_t size) {
+  jsl_log(JSL_DBG_ME, "yfs_client_resize %016llx\n", num);
+  std::string extent;
+  VERIFY(ec->get(num, extent) == extent_protocol::OK);
+  extent.resize(size, 0);
+  VERIFY(ec->put(num, extent) == extent_protocol::OK);
+  return OK;
+}
+
 yfs_client::inum
 yfs_client::fresh_inum(bool is_dir)
 {
-  unsigned int r = rand(); 
+  unsigned long int r = rand(); 
   if (!is_dir) { r |= 0x80000000; }
   return (inum) r;
 }

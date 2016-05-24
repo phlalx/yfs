@@ -72,6 +72,11 @@ public:
   // precondition: parent is a dir, and it exists
   void read_dir(inum parent, std::vector<dirent> &v);
 
+  status read(inum num, size_t size, off_t off, std::string &buf);
+
+  status write(inum num, size_t size, off_t off, const char *buf);
+
+  status resize(inum num, size_t size);
 };
 
 #endif 

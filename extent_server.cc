@@ -19,10 +19,9 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
   v.buf = buf;
   v.attr.size = buf.size();
   time_t cur_time = time(NULL);
-  if (v.attr.ctime == 0) {
-    // TODO why not set access time so it's not zero right after creation?
-    v.attr.ctime = cur_time;
-  }
+
+  // TODO why change ctime at every access?
+  v.attr.ctime = cur_time;
   v.attr.mtime = cur_time;
   return extent_protocol::OK;
 }

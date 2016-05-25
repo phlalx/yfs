@@ -11,6 +11,22 @@
 class yfs_client {
 
   extent_client *ec;
+  lock_client *lc;
+
+  const lock_protocol::lockid_t global_lock = 1L; 
+
+  struct ScopedLock {
+  private:
+    lock_client *lc;
+    lock_protocol::lockid_t l;
+  public:
+    ScopedLock(lock_client *lc, lock_protocol::lockid_t l) : lc(lc), l(l) {
+      lc->acquire(l);
+    }
+    ~ScopedLock() {
+      lc->release(l);
+    }
+  };
 
 public:
 

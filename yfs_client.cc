@@ -29,7 +29,7 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
 }
 
 yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_inum) {
-//  ScopedLock(lc, global_lock);
+  ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_create %s\n", name);
 
   extent_protocol::status st1, st2;

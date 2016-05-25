@@ -254,7 +254,7 @@ fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 			fuse_reply_err(req, EEXIST);
 		} else {
 			fuse_reply_err(req, ENOENT);
-      // TODO prevoir le cas erreur systeme
+      // TODO pas d'autre cas d'erreur ?
 		}
   }
 }

@@ -7,6 +7,7 @@
 #include <vector>
 #include "lock_protocol.h"
 #include "lock_client.h"
+#include "jsl_log.h"
 
 class yfs_client {
 
@@ -21,10 +22,14 @@ class yfs_client {
     lock_protocol::lockid_t l;
   public:
     ScopedLock(lock_client *lc, lock_protocol::lockid_t l) : lc(lc), l(l) {
-      lc->acquire(l);
+      jsl_log(JSL_DBG_ME, "acquiring lock\n");
+      lock_protocol::status st = lc->acquire(l);
+      jsl_log(JSL_DBG_ME, "acquiring lock - ok %d\n", st);
     }
     ~ScopedLock() {
-      lc->release(l);
+      jsl_log(JSL_DBG_ME, "releasing lock\n");
+      lock_protocol::status st = lc->release(l);
+      jsl_log(JSL_DBG_ME, "releasing lock - ok %d\n", st);
     }
   };
 

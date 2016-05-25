@@ -13,6 +13,7 @@
 #include <time.h> 
 #include <jsl_log.h> 
 #include <sstream> 
+#include <algorithm> 
 
 // TODO at some point use const & wherever possible
 std::string yfs_client::serialize_dir(std::vector<dirent> dir) {
@@ -64,6 +65,42 @@ int yfs_client::create(inum parent, const char *name, inum &file_inum) {
  VERIFY(ec->put(file_inum, "") == extent_protocol::OK);
  VERIFY(ec->put(parent, new_dir) == extent_protocol::OK);
  jsl_log(JSL_DBG_ME, "yfs_client_create file %016llx and added to parent dir\n", file_inum);
+ return 0;
+}
+
+int yfs_client::mkdir(inum parent, const char *name, inum &dir_inum) {
+ jsl_log(JSL_DBG_ME, "yfs_client_mkdir %s\n", name);
+ std::vector<dirent> content;
+ read_dir(parent, content);
+ for (dirent const &de : content) {
+  if (de.name == name) { 
+   jsl_log(JSL_DBG_ME, "yfs_client_mkdir dir exists\n");
+   return -1; }
+ }
+ dir_inum = fresh_inum(true);
+ content.push_back(dirent(name, dir_inum));
+ std::string new_dir = serialize_dir(content);
+ VERIFY(ec->put(dir_inum, "") == extent_protocol::OK);
+ VERIFY(ec->put(parent, new_dir) == extent_protocol::OK);
+ jsl_log(JSL_DBG_ME, "yfs_client_mkdir dir %016llx created and added to parent dir\n", dir_inum);
+ return 0;
+}
+
+// TODO utiliser lookup plutot que de refaire la recherche dans le dir à chaque fois
+int yfs_client::unlink(inum parent, const char *name) {
+ jsl_log(JSL_DBG_ME, "yfs_client_unlink %s\n", name);
+ std::vector<dirent> content;
+ read_dir(parent, content);
+ auto it = std::find_if(content.begin(), content.end(), [name] (dirent &s) { return s.name == name; } );
+ if (it == content.end()) {
+   jsl_log(JSL_DBG_ME, "yfs_client_unlink file doesn't exists\n");
+   return -1;
+ }
+ jsl_log(JSL_DBG_ME, "yfs_client_unlink removing file\n");
+ VERIFY(ec->remove(it->inum) == extent_protocol::OK);
+ content.erase(it);
+ std::string new_dir = serialize_dir(content);
+ VERIFY(ec->put(parent, new_dir) == extent_protocol::OK);
  return 0;
 }
 

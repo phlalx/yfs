@@ -189,7 +189,6 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
                  const char *buf, size_t size, off_t off,
                  struct fuse_file_info *fi)
 {
-  size_t bytes_written;
   yfs_client::status st = yfs->write(ino, size, off, buf);
 
   if (st == yfs_client::OK) {
@@ -392,15 +391,15 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
   e.attr_timeout = 0.0;
   e.entry_timeout = 0.0;
   e.generation = 0;
-  // Suppress compiler warning of unused e.
-  (void) e;
 
-  // You fill this in for Lab 3
-#if 0
+  yfs_client::inum dir_inum = 0;
+  int st = yfs->mkdir(parent, name, dir_inum);
+  if (st < 0) {
+    fuse_reply_err(req, EEXIST);
+  }
+  e.ino = dir_inum;
+  getattr(dir_inum, e.attr);
   fuse_reply_entry(req, &e);
-#else
-  fuse_reply_err(req, ENOSYS);
-#endif
 }
 
 //
@@ -413,11 +412,12 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
 void
 fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
-
-  // You fill this in for Lab 3
-  // Success:	fuse_reply_err(req, 0);
-  // Not found:	fuse_reply_err(req, ENOENT);
-  fuse_reply_err(req, ENOSYS);
+  int st = yfs->unlink(parent, name);
+  if (st < 0) {
+    fuse_reply_err(req, ENOENT);
+  } else {
+    fuse_reply_err(req, 0);
+  }
 }
 
 void

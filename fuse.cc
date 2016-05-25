@@ -228,14 +228,16 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
   e->generation = 0;
 
   yfs_client::inum file_inum = 0;
-  int st = yfs->create(parent, name, file_inum);
-  if (st < 0) {
+  yfs_client::status st = yfs->create(parent, name, file_inum);
+  if (st == yfs_client::EXIST) {
     return yfs_client::EXIST;
+  } else if (st != yfs_client::OK) {
+    return st;
   }
-  e->ino = file_inum;
-  getattr(file_inum, e->attr);
 
-  return yfs_client::OK;
+  e->ino = file_inum;
+  st = getattr(file_inum, e->attr);
+  return st;
 }
 
 void
@@ -250,8 +252,9 @@ fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
   } else {
 		if (ret == yfs_client::EXIST) {
 			fuse_reply_err(req, EEXIST);
-		}else{
+		} else {
 			fuse_reply_err(req, ENOENT);
+      // TODO prevoir le cas erreur systeme
 		}
   }
 }
@@ -265,8 +268,8 @@ void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent,
   } else {
 		if (ret == yfs_client::EXIST) {
 			fuse_reply_err(req, EEXIST);
-		}else{
-			fuse_reply_err(req, ENOENT);
+		} else {
+			fuse_reply_err(req, ENOSYS);
 		}
   }
 }
@@ -285,20 +288,26 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
   e.attr_timeout = 0.0;
   e.entry_timeout = 0.0;
   e.generation = 0;
-  bool found = false;
 
   yfs_client::inum file_inum = 0L;
-  found = yfs->lookup(parent, name, file_inum);
-
+  yfs_client::status st = yfs->lookup(parent, name, file_inum);
+  yfs_client::status st1; 
   e.ino = file_inum;
 
-  if (found) {
-    yfs_client::status st = getattr(file_inum, e.attr); 
-    VERIFY(st == yfs_client::OK);
-    fuse_reply_entry(req, &e);
-  }
-  else {
-    fuse_reply_err(req, ENOENT);
+  switch (st) {
+    case yfs_client::OK:
+      st1 = getattr(file_inum, e.attr); 
+      if (st1 == yfs_client::OK) {
+        fuse_reply_entry(req, &e);
+      } else {
+        fuse_reply_err(req, ENOSYS);
+      }
+      break;
+    case (yfs_client::NOENT):
+      fuse_reply_err(req, ENOENT);
+      break;
+    default:
+      fuse_reply_err(req, ENOSYS);
   }
 }
 
@@ -352,7 +361,11 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   }
 
   std::vector<yfs_client::dirent> v;
-  yfs->read_dir(ino, v);
+  yfs_client::status st = yfs->read_dir(ino, v);
+  if (st != yfs_client::OK) {
+      fuse_reply_err(req, ENOSYS);
+      return;
+  }
 
   memset(&b, 0, sizeof(b));
 
@@ -393,9 +406,14 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
   e.generation = 0;
 
   yfs_client::inum dir_inum = 0;
-  int st = yfs->mkdir(parent, name, dir_inum);
-  if (st < 0) {
+  yfs_client::status st = yfs->mkdir(parent, name, dir_inum);
+  if (st == yfs_client::EXIST) {
     fuse_reply_err(req, EEXIST);
+    return;
+  }
+  if (st != yfs_client::OK) {
+      fuse_reply_err(req, ENOSYS);
+      return;
   }
   e.ino = dir_inum;
   getattr(dir_inum, e.attr);
@@ -412,8 +430,8 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
 void
 fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
-  int st = yfs->unlink(parent, name);
-  if (st < 0) {
+  yfs_client::status st = yfs->unlink(parent, name);
+  if (st == yfs_client::NOENT) {
     fuse_reply_err(req, ENOENT);
   } else {
     fuse_reply_err(req, 0);

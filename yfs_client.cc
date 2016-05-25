@@ -28,94 +28,136 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
   VERIFY(ec->put(root_inum, "") == extent_protocol::OK);
 }
 
-int yfs_client::create(inum parent, const char *name, inum &file_inum) {
-  ScopedLock(lc, global_lock);
+yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_inum) {
+//  ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_create %s\n", name);
+
+  extent_protocol::status st1, st2;
+
   std::vector<dirent> content;
-  read_dir(parent, content);
+  st1 = read_dir(parent, content);
+  if (st1 != extent_protocol::OK) {
+    return IOERR; 
+  }
+
   for (dirent const &de : content) {
     if (de.name == name) { 
       jsl_log(JSL_DBG_ME, "yfs_client_create file exists\n");
-      return -1; 
+      return EXIST; 
     }
   }
   file_inum = fresh_inum(false);
   content.push_back(dirent(name, file_inum));
   std::string new_dir = serialize_dir(content);
-  VERIFY(ec->put(file_inum, "") == extent_protocol::OK);
-  VERIFY(ec->put(parent, new_dir) == extent_protocol::OK);
+
+  st1 = ec->put(file_inum, "");
+  st2 = ec->put(parent, new_dir);
+  if (st1 != extent_protocol::OK || st2 != extent_protocol::OK) {
+    return IOERR; 
+  }
+
   jsl_log(JSL_DBG_ME, "yfs_client_create file %016llx and added to parent dir\n", file_inum);
-  return 0;
+  return OK;
 }
 
-int yfs_client::mkdir(inum parent, const char *name, inum &dir_inum) {
+yfs_client::status yfs_client::mkdir(inum parent, const char *name, inum &dir_inum) {
   //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_mkdir %s\n", name);
   std::vector<dirent> content;
-  read_dir(parent, content);
+  extent_protocol::status st1, st2;
+  st1 = read_dir(parent, content);
+  if (st1 != extent_protocol::OK) {
+    return IOERR; 
+  }
   for (dirent const &de : content) {
     if (de.name == name) { 
      jsl_log(JSL_DBG_ME, "yfs_client_mkdir dir exists\n");
-     return -1; 
+     return EXIST; 
     }
   }
   dir_inum = fresh_inum(true);
   content.push_back(dirent(name, dir_inum));
   std::string new_dir = serialize_dir(content);
-  VERIFY(ec->put(dir_inum, "") == extent_protocol::OK);
-  VERIFY(ec->put(parent, new_dir) == extent_protocol::OK);
+  st1 = ec->put(dir_inum, "");
+  st2 = ec->put(parent, new_dir);
+  if (st1 != extent_protocol::OK || st2 != extent_protocol::OK) {
+    return IOERR; 
+  }
   jsl_log(JSL_DBG_ME, "yfs_client_mkdir dir %016llx created and added to parent dir\n", dir_inum);
-  return 0;
+  return OK;
 }
 
 // TODO utiliser lookup plutot que de refaire la recherche dans le dir à chaque fois
-int yfs_client::unlink(inum parent, const char *name) {
+yfs_client::status yfs_client::unlink(inum parent, const char *name) {
   //ScopedLock(lc, global_lock);
  jsl_log(JSL_DBG_ME, "yfs_client_unlink %s\n", name);
  std::vector<dirent> content;
- read_dir(parent, content);
+ extent_protocol::status st1;
+ st1 = read_dir(parent, content);
+ if (st1 != extent_protocol::OK) {
+    return IOERR; 
+ }
+
  auto it = std::find_if(content.begin(), content.end(), [name] (dirent &s) { return s.name == name; } );
  if (it == content.end()) {
    jsl_log(JSL_DBG_ME, "yfs_client_unlink file doesn't exists\n");
-   return -1;
+   return NOENT;
  }
  jsl_log(JSL_DBG_ME, "yfs_client_unlink removing file\n");
- VERIFY(ec->remove(it->inum) == extent_protocol::OK);
+ st1 = ec->remove(it->inum);
+ if (st1 != extent_protocol::OK) { 
+  return IOERR;
+ }
  content.erase(it);
  std::string new_dir = serialize_dir(content);
- VERIFY(ec->put(parent, new_dir) == extent_protocol::OK);
- return 0;
+ st1 = ec->put(parent, new_dir);
+ if (st1 != extent_protocol::OK) { 
+  return IOERR;
+ }
+ return OK;
 }
 
-bool yfs_client::lookup(inum parent, const char *name, inum &file_inum) {
+yfs_client::status yfs_client::lookup(inum parent, const char *name, inum &file_inum) {
   //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_lookup %s\n", name);
   std::vector<dirent> content;
-  read_dir(parent, content);
+  extent_protocol::status st1;
+  st1 = read_dir(parent, content);
+  if (st1 != extent_protocol::OK) {
+    return IOERR; 
+  }
   for (dirent const &de : content) {
     if (de.name == name) {
       file_inum = de.inum;
       jsl_log(JSL_DBG_ME, "yfs_client_lookup found %s %llx\n", name, file_inum);
-      return true; 
+      return OK; 
     }
   }
   jsl_log(JSL_DBG_ME, "yfs_client_lookup didn't found %s\n", name);
-  return false;
+  return NOENT;
 }
 
-void yfs_client::read_dir(inum parent, std::vector<dirent> &v) {
+yfs_client::status yfs_client::read_dir(inum parent, std::vector<dirent> &v) {
  jsl_log(JSL_DBG_ME, "yfs_client_read_dir %016llx\n", parent);
  VERIFY(isdir(parent));  
  std::string buf;
- VERIFY(ec->get(parent, buf) == extent_protocol::OK);
+ extent_protocol::status st = ec->get(parent, buf);
+ if (st != extent_protocol::OK) {
+  return IOERR;
+ }
  deserialize_dir(buf, v);
+ return OK;
 }
 
 yfs_client::status yfs_client::read(inum num, size_t size, off_t off, std::string &buf) {
   //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_read %016llx size %lu off %lu\n", num, size, off);
   std::string extent;
-  VERIFY(ec->get(num, extent) == extent_protocol::OK);
+  extent_protocol::status st = ec->get(num, extent);
+  if (st != extent_protocol::OK) {
+    return IOERR;
+  }
+
   size_t extent_size = extent.size();
   if ((size_t)off >= extent_size) { // TODO est-ce utile ? voir comportement par defaut de substr
     buf = "";
@@ -132,7 +174,11 @@ yfs_client::status yfs_client::write(inum num, size_t size, off_t off, const cha
   if (size == 0) {
     return OK;
   }
-  VERIFY(ec->get(num, extent) == extent_protocol::OK);
+  extent_protocol::status st = ec->get(num, extent);
+  if (st != extent_protocol::OK) {
+    return IOERR;
+  }
+
   size_t old_size = extent.size();
   size_t new_size = std::max(old_size, off + size); 
   jsl_log(JSL_DBG_ME, "yfs_client_write %016llx - size %lu - old size %lu - new size - %lu - offset %lu\n", num, size, old_size, new_size, off);
@@ -148,7 +194,10 @@ yfs_client::status yfs_client::write(inum num, size_t size, off_t off, const cha
   }
 
   // update extent
-  VERIFY(ec->put(num, extent) == extent_protocol::OK);
+  st = ec->put(num, extent);
+  if (st != extent_protocol::OK) {
+    return IOERR;
+  }
   return OK;
 }
 
@@ -156,13 +205,17 @@ yfs_client::status yfs_client::resize(inum num, size_t size) {
   //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_resize %016llx\n", num);
   std::string extent;
-  VERIFY(ec->get(num, extent) == extent_protocol::OK);
+  extent_protocol::status st1, st2;
+  st1 = ec->get(num, extent);
   extent.resize(size, 0);
-  VERIFY(ec->put(num, extent) == extent_protocol::OK);
+  st2 = ec->put(num, extent);
+  if (st1 != extent_protocol::OK && st2 != extent_protocol::OK) {
+    return IOERR;
+  }
   return OK;
 }
 
-int
+yfs_client::status
 yfs_client::getfile(inum inum, fileinfo &fin)
 {
   //ScopedLock(lc, global_lock);
@@ -188,7 +241,7 @@ yfs_client::getfile(inum inum, fileinfo &fin)
   return r;
 }
 
-int
+yfs_client::status
 yfs_client::getdir(inum inum, dirinfo &din)
 {
   //ScopedLock(lc, global_lock);

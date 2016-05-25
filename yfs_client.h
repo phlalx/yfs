@@ -68,8 +68,8 @@ public:
   bool isfile(inum);
   bool isdir(inum);
 
-  int getfile(inum, fileinfo &);
-  int getdir(inum, dirinfo &);
+  status getfile(inum, fileinfo &);
+  status getdir(inum, dirinfo &);
 
 
   // TODO supprimer les VERIFY qui feront planter le programme et utiliser 
@@ -78,23 +78,23 @@ public:
 
   // precondition: parent is a dir
   // -1 if name already exists
-  int create(inum parent, const char *name, inum &file_inum);
+  status create(inum parent, const char *name, inum &file_inum);
 
   // precondition: parent is a dir
   // we don't know if name is a dir or a file, so we use a file info
   // to retrieve the attributes 
-  bool lookup(inum parent, const char *name, inum &file_inum);
+  status lookup(inum parent, const char *name, inum &file_inum);
 
   // precondition: parent is a dir, and it exists
-  void read_dir(inum parent, std::vector<dirent> &v);
+  status read_dir(inum parent, std::vector<dirent> &v);
 
-  int mkdir(inum parent, const char *name, inum &dir_inum);
+  status mkdir(inum parent, const char *name, inum &dir_inum);
 
   status read(inum num, size_t size, off_t off, std::string &buf);
 
   status write(inum num, size_t size, off_t off, const char *buf);
 
-  int unlink(inum parent, const char *name);
+  status unlink(inum parent, const char *name);
 
   status resize(inum num, size_t size);
 };

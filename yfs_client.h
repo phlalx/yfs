@@ -39,30 +39,9 @@ public:
     dirent(std::string name, yfs_client::inum inum) : name(name), inum(inum) {}
   };
 
-  struct ScopedLock {
-  private:
-    lock_client *lc;
-    inum l;
-  public:
-    ScopedLock(yfs_client *yfc, inum i) : lc(yfc->lc) , l(i) {
-      jsl_log(JSL_DBG_ME, "acquiring lock\n");
-      lock_protocol::status st = lc->acquire(l);
-      jsl_log(JSL_DBG_ME, "acquiring lock - ok %d\n", st);
-    }
-    ~ScopedLock() {
-      jsl_log(JSL_DBG_ME, "releasing lock\n");
-      lock_protocol::status st = lc->release(l);
-      jsl_log(JSL_DBG_ME, "releasing lock - ok %d\n", st);
-    }
-  };
+  void acquireLock(inum i);
 
-  void acquireLock(inum i) {
-      lc->acquire(i);
-  }
-
-  void releaseLock(inum i) {
-    lc->release(i);
-  }
+  void releaseLock(inum i);
 
 private:
   

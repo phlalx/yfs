@@ -95,6 +95,7 @@ void
 fuseserver_getattr(fuse_req_t req, fuse_ino_t ino,
                    struct fuse_file_info *fi)
 {
+  yfs->acquireLock(1);
     struct stat st;
     yfs_client::inum inum = ino; // req->in.h.nodeid;
     yfs_client::status ret;
@@ -102,9 +103,11 @@ fuseserver_getattr(fuse_req_t req, fuse_ino_t ino,
     ret = getattr(inum, st);
     if(ret != yfs_client::OK){
       fuse_reply_err(req, ENOENT);
+      yfs->releaseLock(1);
       return;
     }
     fuse_reply_attr(req, &st, 0);
+    yfs->releaseLock(1);
 }
 
 //

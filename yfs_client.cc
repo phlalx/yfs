@@ -15,11 +15,22 @@
 #include <sstream> 
 #include <algorithm> 
 
+void yfs_client::acquireLock(inum i) {
+  jsl_log(JSL_DBG_ME, "acquiring lock\n");
+  lock_protocol::status st = lc->acquire(i);
+  jsl_log(JSL_DBG_ME, "acquiring lock - ok %d\n", st);
+}
+
+void yfs_client::releaseLock(inum i) {
+  jsl_log(JSL_DBG_ME, "releasing lock\n");
+  lock_protocol::status st = lc->release(i);
+  jsl_log(JSL_DBG_ME, "releasing lock - ok %d\n", st);
+}
 
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
   ec = new extent_client(extent_dst);
   lc = new lock_client(lock_dst);
-  srand (time(NULL)); 
+  srand (time(NULL));  // TODO déjà fait dans fuse ??
 
   // create root directory
   const int root_inum = 1;
@@ -158,7 +169,7 @@ yfs_client::status yfs_client::read(inum num, size_t size, off_t off, std::strin
     buf = "";
     return OK;
   }
-  buf = extent.substr(off, extent_size); 
+  buf = extent.substr(off, size); 
   return OK;
 }
 

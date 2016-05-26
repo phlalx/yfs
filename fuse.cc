@@ -127,7 +127,7 @@ void
 fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
                    int to_set, struct fuse_file_info *fi)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(ino);
   jsl_log(JSL_DBG_ME, "fuseserver_setattr 0x%x\n", to_set);
   if (FUSE_SET_ATTR_SIZE & to_set) {
     jsl_log(JSL_DBG_ME, "   fuseserver_setattr set size to %zu\n", attr->st_size);
@@ -143,7 +143,7 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
   } else {
     fuse_reply_err(req, ENOSYS);
   }
-  yfs->releaseLock(1);
+  yfs->releaseLock(ino);
 }
 
 //
@@ -162,7 +162,7 @@ void
 fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
                 off_t off, struct fuse_file_info *fi)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(ino);
   std::string buf;
 
   yfs_client::status st = yfs->read(ino, size, off, buf);
@@ -172,7 +172,7 @@ fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
   } else {
     fuse_reply_err(req, ENOSYS);
   }
-  yfs->releaseLock(1);
+  yfs->releaseLock(ino);
 }
 
 //
@@ -195,7 +195,7 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
                  const char *buf, size_t size, off_t off,
                  struct fuse_file_info *fi)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(ino);
   yfs_client::status st = yfs->write(ino, size, off, buf);
 
   if (st == yfs_client::OK) {
@@ -203,7 +203,7 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
   } else {
     fuse_reply_err(req, ENOSYS);
   }
-  yfs->releaseLock(1);
+  yfs->releaseLock(ino);
 }
 
 //
@@ -251,7 +251,7 @@ void
 fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
                   mode_t mode, struct fuse_file_info *fi)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(parent);
   jsl_log(JSL_DBG_ME, "fuse fuseserver_create %016lx %s\n", parent, name);
   struct fuse_entry_param e;
   yfs_client::status ret;
@@ -265,12 +265,12 @@ fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
       // TODO pas d'autre cas d'erreur ?
 		}
   }
-  yfs->releaseLock(1);
+  yfs->releaseLock(parent);
 }
 
 void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent, 
     const char *name, mode_t mode, dev_t rdev ) {
-  yfs->acquireLock(1);
+  yfs->acquireLock(parent);
   struct fuse_entry_param e;
   yfs_client::status ret;
   if( (ret = fuseserver_createhelper( parent, name, mode, &e )) == yfs_client::OK ) {
@@ -282,7 +282,7 @@ void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, ENOSYS);
 		}
   }
-  yfs->releaseLock(1);
+  yfs->releaseLock(parent);
 }
 
 //
@@ -293,7 +293,7 @@ void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent,
 void
 fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(parent);
   jsl_log(JSL_DBG_ME, "fuse fuseserver_lookup %016lx %s\n", parent, name);
   struct fuse_entry_param e;
   // In yfs, timeouts are always set to 0.0, and generations are always set to 0
@@ -321,7 +321,7 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
     default:
       fuse_reply_err(req, ENOSYS);
   }
-  yfs->releaseLock(1);
+  yfs->releaseLock(parent);
 }
 
 
@@ -365,13 +365,13 @@ void
 fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                    off_t off, struct fuse_file_info *fi)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(ino);
   yfs_client::inum inum = ino; // req->in.h.nodeid;
   struct dirbuf b;
 
   if(!yfs->isdir(inum)){
     fuse_reply_err(req, ENOTDIR);
-    yfs->releaseLock(1);
+    yfs->releaseLock(ino);
     return;
   }
 
@@ -379,7 +379,7 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   yfs_client::status st = yfs->read_dir(ino, v);
   if (st != yfs_client::OK) {
       fuse_reply_err(req, ENOSYS);
-      yfs->releaseLock(1);
+      yfs->releaseLock(ino);
       return;
   }
 
@@ -391,7 +391,7 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
   reply_buf_limited(req, b.p, b.size, off, size);
   free(b.p);
-  yfs->releaseLock(1);
+  yfs->releaseLock(ino);
 }
 
 
@@ -399,9 +399,9 @@ void
 fuseserver_open(fuse_req_t req, fuse_ino_t ino,
      struct fuse_file_info *fi)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(ino);
   fuse_reply_open(req, fi);
-  yfs->releaseLock(1);
+  yfs->releaseLock(ino);
 }
 
 //
@@ -418,7 +418,7 @@ void
 fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
      mode_t mode)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(parent);
   struct fuse_entry_param e;
   // In yfs, timeouts are always set to 0.0, and generations are always set to 0
   e.attr_timeout = 0.0;
@@ -429,18 +429,18 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
   yfs_client::status st = yfs->mkdir(parent, name, dir_inum);
   if (st == yfs_client::EXIST) {
     fuse_reply_err(req, EEXIST);
-    yfs->releaseLock(1);
+    yfs->releaseLock(parent);
     return;
   }
   if (st != yfs_client::OK) {
       fuse_reply_err(req, ENOSYS);
-      yfs->releaseLock(1);
+      yfs->releaseLock(parent);
       return;
   }
   e.ino = dir_inum;
   getattr(dir_inum, e.attr);
   fuse_reply_entry(req, &e);
-  yfs->releaseLock(1);
+  yfs->releaseLock(parent);
 }
 
 //
@@ -453,14 +453,14 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
 void
 fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
-  yfs->acquireLock(1);
+  yfs->acquireLock(parent);
   yfs_client::status st = yfs->unlink(parent, name);
   if (st == yfs_client::NOENT) {
     fuse_reply_err(req, ENOENT);
   } else {
     fuse_reply_err(req, 0);
   }
-  yfs->releaseLock(1);
+  yfs->releaseLock(parent);
 }
 
 void

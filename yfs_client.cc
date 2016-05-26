@@ -29,7 +29,6 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
 }
 
 yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_inum) {
-  ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_create %s\n", name);
 
   extent_protocol::status st1, st2;
@@ -61,7 +60,6 @@ yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_
 }
 
 yfs_client::status yfs_client::mkdir(inum parent, const char *name, inum &dir_inum) {
-  //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_mkdir %s\n", name);
   std::vector<dirent> content;
   extent_protocol::status st1, st2;
@@ -89,7 +87,6 @@ yfs_client::status yfs_client::mkdir(inum parent, const char *name, inum &dir_in
 
 // TODO utiliser lookup plutot que de refaire la recherche dans le dir à chaque fois
 yfs_client::status yfs_client::unlink(inum parent, const char *name) {
-  //ScopedLock(lc, global_lock);
  jsl_log(JSL_DBG_ME, "yfs_client_unlink %s\n", name);
  std::vector<dirent> content;
  extent_protocol::status st1;
@@ -118,7 +115,6 @@ yfs_client::status yfs_client::unlink(inum parent, const char *name) {
 }
 
 yfs_client::status yfs_client::lookup(inum parent, const char *name, inum &file_inum) {
-  //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_lookup %s\n", name);
   std::vector<dirent> content;
   extent_protocol::status st1;
@@ -150,7 +146,6 @@ yfs_client::status yfs_client::read_dir(inum parent, std::vector<dirent> &v) {
 }
 
 yfs_client::status yfs_client::read(inum num, size_t size, off_t off, std::string &buf) {
-  //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_read %016llx size %lu off %lu\n", num, size, off);
   std::string extent;
   extent_protocol::status st = ec->get(num, extent);
@@ -168,7 +163,6 @@ yfs_client::status yfs_client::read(inum num, size_t size, off_t off, std::strin
 }
 
 yfs_client::status yfs_client::write(inum num, size_t size, off_t off, const char *buf) {
-  //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_write %016llx\n", num);
   std::string extent;
   if (size == 0) {
@@ -202,7 +196,6 @@ yfs_client::status yfs_client::write(inum num, size_t size, off_t off, const cha
 }
 
 yfs_client::status yfs_client::resize(inum num, size_t size) {
-  //ScopedLock(lc, global_lock);
   jsl_log(JSL_DBG_ME, "yfs_client_resize %016llx\n", num);
   std::string extent;
   extent_protocol::status st1, st2;
@@ -218,7 +211,6 @@ yfs_client::status yfs_client::resize(inum num, size_t size) {
 yfs_client::status
 yfs_client::getfile(inum inum, fileinfo &fin)
 {
-  //ScopedLock(lc, global_lock);
   int r = OK;
   // You modify this function for Lab 3
   // - hold and release the file lock
@@ -244,7 +236,6 @@ yfs_client::getfile(inum inum, fileinfo &fin)
 yfs_client::status
 yfs_client::getdir(inum inum, dirinfo &din)
 {
-  //ScopedLock(lc, global_lock);
   int r = OK;
   // You modify this function for Lab 3
   // - hold and release the directory lock

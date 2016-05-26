@@ -12,26 +12,7 @@
 class yfs_client {
 
   extent_client *ec;
-  lock_client *lc;
-
-  const lock_protocol::lockid_t global_lock = 1L; 
-
-  struct ScopedLock {
-  private:
-    lock_client *lc;
-    lock_protocol::lockid_t l;
-  public:
-    ScopedLock(lock_client *lc, lock_protocol::lockid_t l) : lc(lc), l(l) {
-      jsl_log(JSL_DBG_ME, "acquiring lock\n");
-      lock_protocol::status st = lc->acquire(l);
-      jsl_log(JSL_DBG_ME, "acquiring lock - ok %d\n", st);
-    }
-    ~ScopedLock() {
-      jsl_log(JSL_DBG_ME, "releasing lock\n");
-      lock_protocol::status st = lc->release(l);
-      jsl_log(JSL_DBG_ME, "releasing lock - ok %d\n", st);
-    }
-  };
+  lock_client *lc = NULL;
 
 public:
 
@@ -58,6 +39,31 @@ public:
     dirent(std::string name, yfs_client::inum inum) : name(name), inum(inum) {}
   };
 
+  struct ScopedLock {
+  private:
+    lock_client *lc;
+    inum l;
+  public:
+    ScopedLock(yfs_client *yfc, inum i) : lc(yfc->lc) , l(i) {
+      jsl_log(JSL_DBG_ME, "acquiring lock\n");
+      lock_protocol::status st = lc->acquire(l);
+      jsl_log(JSL_DBG_ME, "acquiring lock - ok %d\n", st);
+    }
+    ~ScopedLock() {
+      jsl_log(JSL_DBG_ME, "releasing lock\n");
+      lock_protocol::status st = lc->release(l);
+      jsl_log(JSL_DBG_ME, "releasing lock - ok %d\n", st);
+    }
+  };
+
+  void acquireLock(inum i) {
+      lc->acquire(i);
+  }
+
+  void releaseLock(inum i) {
+    lc->release(i);
+  }
+
 private:
   
   static std::string filename(inum);
@@ -75,7 +81,6 @@ public:
 
   status getfile(inum, fileinfo &);
   status getdir(inum, dirinfo &);
-
 
   // TODO supprimer les VERIFY qui feront planter le programme et utiliser 
   // les codes de retour dédiés (cf. get attr dans fuse.cc)

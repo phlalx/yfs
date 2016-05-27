@@ -28,8 +28,9 @@ void yfs_client::releaseLock(inum i) {
 }
 
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
+  lock_release_user *lru = new my_lock_release_user(ec);
   ec = new extent_client_cache(extent_dst);
-  lc = new lock_client_cache(lock_dst);
+  lc = new lock_client_cache(lock_dst, lru);
   srand (time(NULL));  // TODO déjà fait dans fuse ??
 
   // create root directory

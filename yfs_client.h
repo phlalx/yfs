@@ -2,8 +2,7 @@
 #define yfs_client_h
 
 #include <string>
-//#include "yfs_protocol.h"
-#include "extent_client.h"
+#include "extent_client_cache.h"
 #include <vector>
 #include "lock_protocol.h"
 #include "lock_client.h"
@@ -11,7 +10,7 @@
 
 class yfs_client {
 
-  extent_client *ec;
+  extent_client_cache *ec;
   lock_client *lc = NULL;
 
 public:

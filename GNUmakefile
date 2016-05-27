@@ -46,7 +46,7 @@ hfiles1=rpc/fifo.h rpc/connection.h rpc/rpc.h rpc/marshall.h rpc/method_thread.h
 	rpc/thr_pool.h rpc/pollmgr.h rpc/jsl_log.h rpc/slock.h rpc/rpctest.cc\
 	lock_protocol.h lock_server.h lock_client.h gettime.h gettime.cc lang/verify.h \
         lang/algorithm.h
-hfiles2=yfs_client.h extent_client.h extent_protocol.h extent_server.h
+hfiles2=yfs_client.h extent_client.h extent_protocol.h extent_server.h extent_client_cache.h
 hfiles3=lock_client_cache.h lock_server_cache.h handle.h tprintf.h
 hfiles4=log.h rsm.h rsm_protocol.h config.h paxos.h paxos_protocol.h rsm_state_transfer.h rsmtest_client.h tprintf.h
 hfiles5=rsm_state_transfer.h rsm_client.h
@@ -86,7 +86,7 @@ endif
 
 lock_server : $(patsubst %.cc,%.o,$(lock_server)) rpc/librpc.a
 
-yfs_client=yfs_client.cc extent_client.cc fuse.cc
+yfs_client=yfs_client.cc extent_client_cache.cc fuse.cc extent_client.cc
 ifeq ($(LAB3GE),1)
   yfs_client += lock_client.cc
 endif

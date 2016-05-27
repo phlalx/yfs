@@ -13,6 +13,14 @@ class extent_client_cache {
 private:
 	extent_client *ec;
 
+	struct Value {
+		extent_protocol::attr attr;
+		std::string buf;
+		bool dirty;
+	};
+
+	std::map<extent_protocol::extentid_t, Value> kv_store; 
+
 public:
 	extent_client_cache(std::string dst);
 

@@ -243,7 +243,9 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
   }
 
   e->ino = file_inum;
+  yfs->acquireLock(file_inum);
   st = getattr(file_inum, e->attr);
+  yfs->releaseLock(file_inum);
   return st;
 }
 
@@ -308,7 +310,9 @@ fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 
   switch (st) {
     case yfs_client::OK:
+      yfs->acquireLock(file_inum);
       st1 = getattr(file_inum, e.attr); 
+      yfs->releaseLock(file_inum);
       if (st1 == yfs_client::OK) {
         fuse_reply_entry(req, &e);
       } else {

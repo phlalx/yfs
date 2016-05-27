@@ -1,4 +1,4 @@
-// RPC stubs for clients to talk to extent_server
+// RPC stubs for clxents to talk to extent_server
 
 #include "extent_client_cache.h"
 #include "extent_client.h"
@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
+#include <slock.h>
 #include <jsl_log.h>
 
 // The calls assume that the caller holds a lock on the extent
@@ -19,21 +20,37 @@ extent_client_cache::extent_client_cache(std::string dst)
 extent_protocol::status
 extent_client_cache::get(extent_protocol::extentid_t eid, std::string &buf)
 {
-  jsl_log(JSL_DBG_ME, "cache_extent_server: get %llu\n", eid);
   extent_protocol::status res = extent_protocol::OK;
-  Value &v = kv_store[eid];
-  if (kv_store.find(eid) == kv_store.end()) {
+  bool found = true;
+  {
+    ScopedLock ml(&mutex); 
+    jsl_log(JSL_DBG_ME, "extent_client_cache: get %lud %llu\n", pthread_self(), eid);
+    if (kv_store.find(eid) == kv_store.end()) {
+      found = false;
+    }
+  }
+  Value copy;
+  if (!found) { // not found locally
     // TODO -> ajouter une opération sur le serveur qui renvoie tout ?
-    res = ec->get(eid, v.buf); 
+    res = ec->get(eid, copy.buf); 
     if (res != extent_protocol::OK) {
       return res;
     }
-    res = ec->getattr(eid, v.attr);
+    res = ec->getattr(eid, copy.attr);
     if (res != extent_protocol::OK) {
       return res;
     }
   }
-  buf = v.buf;
+  // qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
+
+  {
+    ScopedLock ml(&mutex); 
+    Value &v = kv_store[eid];
+    if (!found) {
+      kv_store[eid] = copy;
+    }
+    buf = v.buf;
+  }
   return res;
 }
 
@@ -41,29 +58,45 @@ extent_protocol::status
 extent_client_cache::getattr(extent_protocol::extentid_t eid, 
 		       extent_protocol::attr &attr)
 {
-  jsl_log(JSL_DBG_ME, "cache_extent_server: getattr %llu\n", eid);
-  // TODO factoriser les deux get
   extent_protocol::status res = extent_protocol::OK;
-  Value &v = kv_store[eid];
+  bool found = true;
+ {
+  ScopedLock ml(&mutex); 
+  jsl_log(JSL_DBG_ME, "extent_client_cache: getattr %lud %llu\n", pthread_self(), eid);
   if (kv_store.find(eid) == kv_store.end()) {
+    found = false;
+  }
+}
+Value copy;
+  if (!found) { // not found locally
     // TODO -> ajouter une opération sur le serveur qui renvoie tout ?
-    res = ec->get(eid, v.buf); 
+    res = ec->get(eid, copy.buf); 
     if (res != extent_protocol::OK) {
       return res;
     }
-    res = ec->getattr(eid, v.attr);
+    res = ec->getattr(eid, copy.attr);
     if (res != extent_protocol::OK) {
       return res;
     }
   }
-  attr = v.attr;
+  // qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
+
+  {
+    ScopedLock ml(&mutex); 
+    Value &v = kv_store[eid];
+    if (!found) {
+      kv_store[eid] = copy;
+    }
+    attr = v.attr;
+  }
   return res;
 }
 
 extent_protocol::status
 extent_client_cache::put(extent_protocol::extentid_t eid, std::string buf)
 {
-  jsl_log(JSL_DBG_ME, "cache_extent_server: put %llu\n", eid);
+  ScopedLock ml(&mutex);
+  jsl_log(JSL_DBG_ME, "extent_client_cache: put %lud %llu\n", pthread_self(), eid);
   Value &v = kv_store[eid];
   v.buf = buf;
   v.attr.size = buf.size();
@@ -79,10 +112,37 @@ extent_client_cache::put(extent_protocol::extentid_t eid, std::string buf)
 extent_protocol::status
 extent_client_cache::remove(extent_protocol::extentid_t eid)
 {
-  jsl_log(JSL_DBG_ME, "cache_extent_server: remove %llu\n", eid);
+  ScopedLock ml(&mutex);
+  jsl_log(JSL_DBG_ME, "extent_client_cache remove %lud %llu\n", pthread_self(), eid);
   if (kv_store.find(eid) == kv_store.end()) {
     return extent_protocol::NOENT;
   }
   kv_store.erase(eid);
   return extent_protocol::OK;
 }
+
+void extent_client_cache::flush(extent_protocol::extentid_t eid) {
+  ScopedLock ml(&mutex);
+  jsl_log(JSL_DBG_ME, "extent_client_cache: flush %lud %llu %p\n", pthread_self(), eid, this);
+  extent_protocol::status res = extent_protocol::OK;
+
+  if (kv_store.find(eid) == kv_store.end()) {
+    jsl_log(JSL_DBG_ME, "extent_client_cache: flush - remove %llu\n", eid);
+    res = ec->remove(eid); 
+    VERIFY(res == extent_protocol::OK);
+    return;
+  }
+  
+  Value &v = kv_store[eid];
+  if (v.dirty) {
+    jsl_log(JSL_DBG_ME, "extent_client_cache: flush - write back %llu\n", eid);
+    // writeback
+    res = ec->put(eid, v.buf);
+    VERIFY(res == extent_protocol::OK);
+  }
+  jsl_log(JSL_DBG_ME, "extent_client_cache: flush - erase %llu\n", eid);
+  kv_store.erase(eid);
+  return;
+}
+
+

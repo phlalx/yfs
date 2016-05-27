@@ -5,7 +5,7 @@
 #include "extent_client_cache.h"
 #include <vector>
 #include "lock_protocol.h"
-#include "lock_client.h"
+#include "lock_client_cache.h"
 #include "jsl_log.h"
 
 class yfs_client {
@@ -44,6 +44,18 @@ public:
 
 private:
   
+  class my_lock_release_user : public lock_release_user {
+  private:
+    extent_client_cache *ec;
+  public:
+    my_lock_release_user(extent_client_cache *ec) : ec(ec) {};
+    virtual void dorelease(lock_protocol::lockid_t id) {
+      jsl_log(JSL_DBG_ME, "yfs_client do release %llu\n", id);
+      ec->flush(id);
+      jsl_log(JSL_DBG_ME, "yfs_client do release done\n");
+    } 
+  };
+
   static std::string filename(inum);
   static inum n2i(std::string);
   static std::string serialize_dir(std::vector<dirent>);

@@ -9,7 +9,19 @@
 #include <fcntl.h>
 #include <jsl_log.h>
 
-extent_server::extent_server() {}
+extent_server::extent_server() {
+  // lock dans le constructeur ?
+  // create root directory TODO mettre cette constante 1 qq part
+  const int root_inum = 1;
+  Value &v = kv_store[root_inum];
+  v.buf = "";
+  v.attr.size = 0;
+  time_t cur_time = time(NULL);
+
+  // TODO why change ctime at every access?
+  v.attr.ctime = cur_time;
+  v.attr.mtime = cur_time;
+}
 
 int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
 { 

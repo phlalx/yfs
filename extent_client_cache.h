@@ -21,6 +21,8 @@ private:
 
 	std::map<extent_protocol::extentid_t, Value> kv_store; 
 
+	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+	
 public:
 	extent_client_cache(std::string dst);
 
@@ -30,6 +32,7 @@ public:
 		extent_protocol::attr &a);
 	extent_protocol::status put(extent_protocol::extentid_t eid, std::string buf);
 	extent_protocol::status remove(extent_protocol::extentid_t eid);
+	void flush(extent_protocol::extentid_t eid);
 };
 
 #endif 

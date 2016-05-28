@@ -122,16 +122,12 @@ fuse.o: fuse.cc
 -include *.d
 -include rpc/*.d
 
-clean_files=rpc/rpctest rpc/*.o rpc/*.d rpc/librpc.a *.o *.d yfs_client extent_server lock_server lock_tester lock_demo rpctest test-lab-3-b test-lab-3-c rsm_tester
-.PHONY: clean handin
+clean_files=rpc/rpctest rpc/*.o rpc/*.d rpc/librpc.a *.o *.d yfs_client extent_server lock_server lock_tester lock_demo rpctest test-lab-3-b test-lab-3-c rsm_tester *.log html latex
+.PHONY: clean handin doc
 clean: 
 	rm $(clean_files) -rf 
 
-handin_ignore=$(clean_files) core* *log
-handin_file=$(shell whoami)-lab$(LAB).tgz
-labdir=$(shell basename $(PWD))
-handin: 
-	@if test -f stop.sh; then ./stop.sh > /dev/null 2>&1 | echo ""; fi
-	@bash -c "cd ../; tar -X <(tr ' ' '\n' < <(echo '$(handin_ignore)')) -czvf $(handin_file) $(labdir); mv $(handin_file) $(labdir); cd $(labdir)"
-	@echo Please email $(handin_file) to 6.824-submit@pdos.csail.mit.edu
-	@echo Thanks!
+doc:
+	doxygen Doxyfile
+
+

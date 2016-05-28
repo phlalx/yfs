@@ -85,6 +85,8 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
     }
 
     jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: server.acquire -> RETRY\n", id.c_str(), pthread_self(), lid);
+    // TODO bug... this assertion doesn't always hold
+    // test3-c .... 
     VERIFY(acquire_ret == lock_protocol::RETRY);
 
     while (!li.is_retried) {

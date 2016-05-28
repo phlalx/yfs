@@ -104,7 +104,6 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
   const lock_protocol::status ret = lock_protocol::OK;
   { 
     jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: release\n", id.c_str(), pthread_self(), lid);
-    lu->dorelease(lid);
     ScopedLock ml(&mutex); 
 
 
@@ -120,6 +119,7 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
     li.set(this, lid, NONE);
   }
 
+  lu->dorelease(lid);
   jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: server.release\n", id.c_str(), pthread_self(), lid);
   int r;
   VERIFY(cl->call(lock_protocol::release, lid, id, r) == lock_protocol::OK);
@@ -147,6 +147,7 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid, int &)
     }
   }
   if (to_release) {
+   lu->dorelease(lid);
    jsl_log(JSL_DBG_ME, "lock_client_cache %s %lud %llu: server.release\n", id.c_str(), pthread_self(), lid);
    int r;
    VERIFY(cl->call(lock_protocol::release, lid, id, r) == lock_protocol::OK);

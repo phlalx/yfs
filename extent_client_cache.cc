@@ -1,4 +1,4 @@
-// RPC stubs for clients to talk to extent_server
+// RPC stubs for clxents to talk to extent_server
 
 #include "extent_client_cache.h"
 #include "extent_client.h"
@@ -24,7 +24,7 @@ extent_client_cache::get(extent_protocol::extentid_t eid, std::string &buf)
   bool found = true;
   {
     ScopedLock ml(&mutex); 
-    jsl_log(JSL_DBG_ME, "extent_client_cache: get %lud %llu: ", pthread_self(), eid);
+    jsl_log(JSL_DBG_ME, "extent_client_cache: get %lud %llu\n", pthread_self(), eid);
     if (kv_store.find(eid) == kv_store.end()) {
       found = false;
     }
@@ -62,7 +62,7 @@ extent_client_cache::getattr(extent_protocol::extentid_t eid,
   bool found = true;
  {
   ScopedLock ml(&mutex); 
-  jsl_log(JSL_DBG_ME, "extent_client_cache: getattr %lud %llu: ", pthread_self(), eid);
+  jsl_log(JSL_DBG_ME, "extent_client_cache: getattr %lud %llu\n", pthread_self(), eid);
   if (kv_store.find(eid) == kv_store.end()) {
     found = false;
   }
@@ -96,7 +96,7 @@ extent_protocol::status
 extent_client_cache::put(extent_protocol::extentid_t eid, std::string buf)
 {
   ScopedLock ml(&mutex);
-  jsl_log(JSL_DBG_ME, "extent_client_cache: put %lud %llu: ", pthread_self(), eid);
+  jsl_log(JSL_DBG_ME, "extent_client_cache: put %lud %llu\n", pthread_self(), eid);
   Value &v = kv_store[eid];
   v.buf = buf;
   v.attr.size = buf.size();
@@ -113,7 +113,7 @@ extent_protocol::status
 extent_client_cache::remove(extent_protocol::extentid_t eid)
 {
   ScopedLock ml(&mutex);
-  jsl_log(JSL_DBG_ME, "extent_client_cache remove %lud %llu: ", pthread_self(), eid);
+  jsl_log(JSL_DBG_ME, "extent_client_cache remove %lud %llu\n", pthread_self(), eid);
   if (kv_store.find(eid) == kv_store.end()) {
     return extent_protocol::NOENT;
   }
@@ -122,10 +122,9 @@ extent_client_cache::remove(extent_protocol::extentid_t eid)
 }
 
 void extent_client_cache::flush(extent_protocol::extentid_t eid) {
-  jsl_log(JSL_DBG_ME, "extent_client_cache: flush %lud %llu: ", pthread_self(), eid);
-//  ScopedLock ml(&mutex);
+  ScopedLock ml(&mutex);
+  jsl_log(JSL_DBG_ME, "extent_client_cache: flush %lud %llu %p\n", pthread_self(), eid, this);
   extent_protocol::status res = extent_protocol::OK;
-  return;
 
   if (kv_store.find(eid) == kv_store.end()) {
     jsl_log(JSL_DBG_ME, "extent_client_cache: flush - remove %llu\n", eid);
@@ -136,11 +135,11 @@ void extent_client_cache::flush(extent_protocol::extentid_t eid) {
   
   Value &v = kv_store[eid];
   if (v.dirty) {
-  jsl_log(JSL_DBG_ME, "extent_client_cache: flush - write back %llu\n", eid);
+    jsl_log(JSL_DBG_ME, "extent_client_cache: flush - write back %llu\n", eid);
     // writeback
     res = ec->put(eid, v.buf);
     VERIFY(res == extent_protocol::OK);
- }
+  }
   jsl_log(JSL_DBG_ME, "extent_client_cache: flush - erase %llu\n", eid);
   kv_store.erase(eid);
   return;

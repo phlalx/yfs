@@ -16,28 +16,25 @@
 #include <algorithm> 
 
 void yfs_client::acquireLock(inum i) {
-  jsl_log(JSL_DBG_ME, "acquiring lock\n");
+  jsl_log(JSL_DBG_ME, "yfs_client::acquiring lock %llu\n", i);
   lock_protocol::status st = lc->acquire(i);
-  jsl_log(JSL_DBG_ME, "acquiring lock - ok %d\n", st);
+  VERIFY(st == lock_protocol::OK);
+  jsl_log(JSL_DBG_ME, "yfs_client::acquired\n");
 }
 
 void yfs_client::releaseLock(inum i) {
-  jsl_log(JSL_DBG_ME, "releasing lock\n");
+  jsl_log(JSL_DBG_ME, "yfs_client::releasing lock %llu\n", i);
   lock_protocol::status st = lc->release(i);
-  jsl_log(JSL_DBG_ME, "releasing lock - ok %d\n", st);
+  VERIFY(st == lock_protocol::OK);
+  jsl_log(JSL_DBG_ME, "yfs_client::released\n");
 }
 
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
-  lock_release_user *lru = new my_lock_release_user(ec);
   ec = new extent_client_cache(extent_dst);
+  lock_release_user *lru = new my_lock_release_user(ec);
   lc = new lock_client_cache(lock_dst, lru);
   srand (time(NULL));  // TODO déjà fait dans fuse ??
 
-  // create root directory
-  const int root_inum = 1;
-
-  // TODO est-ce que c'est judicieux de mettre ça dans le constructeur ?
-  VERIFY(ec->put(root_inum, "") == extent_protocol::OK);
 }
 
 yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_inum) {
@@ -61,7 +58,10 @@ yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_
   content.push_back(dirent(name, file_inum));
   std::string new_dir = serialize_dir(content);
 
+  acquireLock(file_inum);  
   st1 = ec->put(file_inum, "");
+  releaseLock(file_inum);  
+
   st2 = ec->put(parent, new_dir);
   if (st1 != extent_protocol::OK || st2 != extent_protocol::OK) {
     return IOERR; 
@@ -88,7 +88,9 @@ yfs_client::status yfs_client::mkdir(inum parent, const char *name, inum &dir_in
   dir_inum = fresh_inum(true);
   content.push_back(dirent(name, dir_inum));
   std::string new_dir = serialize_dir(content);
+  acquireLock(dir_inum);  
   st1 = ec->put(dir_inum, "");
+  releaseLock(dir_inum);  
   st2 = ec->put(parent, new_dir);
   if (st1 != extent_protocol::OK || st2 != extent_protocol::OK) {
     return IOERR; 

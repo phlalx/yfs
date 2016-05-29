@@ -12,14 +12,12 @@
 
 // The calls assume that the caller holds a lock on the extent
 
-extent_client_cache::extent_client_cache(std::string dst)
-{
+extent_client_cache::extent_client_cache(std::string dst) {
   ec = new extent_client(dst);
 }
 
-extent_protocol::status
-extent_client_cache::get(extent_protocol::extentid_t eid, std::string &buf)
-{
+extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid, 
+                                                 std::string &buf) {
   extent_protocol::status res = extent_protocol::OK;
   bool found = true;
   {
@@ -54,20 +52,18 @@ extent_client_cache::get(extent_protocol::extentid_t eid, std::string &buf)
   return res;
 }
 
-extent_protocol::status
-extent_client_cache::getattr(extent_protocol::extentid_t eid, 
-		       extent_protocol::attr &attr)
-{
+extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t eid, 
+                                                     extent_protocol::attr &attr) {
   extent_protocol::status res = extent_protocol::OK;
   bool found = true;
- {
-  ScopedLock ml(&mutex); 
-  jsl_log(JSL_DBG_ME, "extent_client_cache: getattr %lud %llu\n", pthread_self(), eid);
-  if (kv_store.find(eid) == kv_store.end()) {
-    found = false;
+  {
+    ScopedLock ml(&mutex); 
+    jsl_log(JSL_DBG_ME, "extent_client_cache: getattr %lud %llu\n", pthread_self(), eid);
+    if (kv_store.find(eid) == kv_store.end()) {
+      found = false;
+    }
   }
-}
-Value copy;
+  Value copy;
   if (!found) { // not found locally
     // TODO -> ajouter une opération sur le serveur qui renvoie tout ?
     res = ec->get(eid, copy.buf); 
@@ -92,9 +88,8 @@ Value copy;
   return res;
 }
 
-extent_protocol::status
-extent_client_cache::put(extent_protocol::extentid_t eid, std::string buf)
-{
+extent_protocol::status extent_client_cache::put(extent_protocol::extentid_t eid,
+                                                 std::string buf) {
   ScopedLock ml(&mutex);
   jsl_log(JSL_DBG_ME, "extent_client_cache: put %lud %llu\n", pthread_self(), eid);
   Value &v = kv_store[eid];
@@ -109,9 +104,8 @@ extent_client_cache::put(extent_protocol::extentid_t eid, std::string buf)
   return extent_protocol::OK;
 }
 
-extent_protocol::status
-extent_client_cache::remove(extent_protocol::extentid_t eid)
-{
+extent_protocol::status extent_client_cache::remove(
+    extent_protocol::extentid_t eid) {
   ScopedLock ml(&mutex);
   jsl_log(JSL_DBG_ME, "extent_client_cache remove %lud %llu\n", pthread_self(), eid);
   if (kv_store.find(eid) == kv_store.end()) {
@@ -129,13 +123,14 @@ void extent_client_cache::flush(extent_protocol::extentid_t eid) {
   if (kv_store.find(eid) == kv_store.end()) {
     jsl_log(JSL_DBG_ME, "extent_client_cache: flush - remove %llu\n", eid);
     res = ec->remove(eid); 
+    // TODO pas toujours bon... test-lab-3-b 
     VERIFY(res == extent_protocol::OK);
     return;
   }
   
   Value &v = kv_store[eid];
   if (v.dirty) {
-    jsl_log(JSL_DBG_ME, "extent_client_cache: flush - write back %llu\n", eid);
+    jsl_log(JSL_DBG_ME, "extent_client_cache: flush - write back %llu buf = %s\n ", eid, v.buf.c_str());
     // writeback
     res = ec->put(eid, v.buf);
     VERIFY(res == extent_protocol::OK);

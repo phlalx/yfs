@@ -1,5 +1,3 @@
-// lock client interface.
-
 #ifndef lock_client_h
 #define lock_client_h
 
@@ -8,7 +6,10 @@
 #include "rpc.h"
 #include <vector>
 
-// Client interface to the lock server
+/** 
+  * RPC stub to talk to lock_server
+  * Thread safe (thanks to rpcc)
+  */
 class lock_client {
  protected:
   rpcc *cl;
@@ -19,6 +20,5 @@ class lock_client {
   virtual lock_protocol::status release(lock_protocol::lockid_t);
   virtual lock_protocol::status stat(lock_protocol::lockid_t);
 };
-
 
 #endif 

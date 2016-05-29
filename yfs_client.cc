@@ -34,10 +34,10 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
   lock_release_user *lru = new my_lock_release_user(ec);
   lc = new lock_client_cache(lock_dst, lru);
   srand (time(NULL));  // TODO déjà fait dans fuse ??
-
 }
 
-yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_inum) {
+yfs_client::status yfs_client::create(inum parent, const char *name, 
+                                      inum &file_inum) {
   jsl_log(JSL_DBG_ME, "yfs_client_create %s\n", name);
 
   extent_protocol::status st1, st2;
@@ -71,7 +71,8 @@ yfs_client::status yfs_client::create(inum parent, const char *name, inum &file_
   return OK;
 }
 
-yfs_client::status yfs_client::mkdir(inum parent, const char *name, inum &dir_inum) {
+yfs_client::status yfs_client::mkdir(inum parent, const char *name, 
+                                     inum &dir_inum) {
   jsl_log(JSL_DBG_ME, "yfs_client_mkdir %s\n", name);
   std::vector<dirent> content;
   extent_protocol::status st1, st2;
@@ -101,16 +102,16 @@ yfs_client::status yfs_client::mkdir(inum parent, const char *name, inum &dir_in
 
 // TODO utiliser lookup plutot que de refaire la recherche dans le dir à chaque fois
 yfs_client::status yfs_client::unlink(inum parent, const char *name) {
- jsl_log(JSL_DBG_ME, "yfs_client_unlink %s\n", name);
- std::vector<dirent> content;
- extent_protocol::status st1;
- st1 = read_dir(parent, content);
- if (st1 != extent_protocol::OK) {
+  jsl_log(JSL_DBG_ME, "yfs_client_unlink %s\n", name);
+  std::vector<dirent> content;
+  extent_protocol::status st1;
+  st1 = read_dir(parent, content);
+  if (st1 != extent_protocol::OK) {
     return IOERR; 
- }
+  }
 
- auto it = std::find_if(content.begin(), content.end(), [name] (dirent &s) { return s.name == name; } );
- if (it == content.end()) {
+  auto it = std::find_if(content.begin(), content.end(), [name] (dirent &s) { return s.name == name; } );
+  if (it == content.end()) {
    jsl_log(JSL_DBG_ME, "yfs_client_unlink file doesn't exists\n");
    return NOENT;
  }
@@ -118,17 +119,18 @@ yfs_client::status yfs_client::unlink(inum parent, const char *name) {
  st1 = ec->remove(it->inum);
  if (st1 != extent_protocol::OK) { 
   return IOERR;
- }
- content.erase(it);
- std::string new_dir = serialize_dir(content);
- st1 = ec->put(parent, new_dir);
- if (st1 != extent_protocol::OK) { 
-  return IOERR;
- }
- return OK;
+  }
+  content.erase(it);
+  std::string new_dir = serialize_dir(content);
+  st1 = ec->put(parent, new_dir);
+  if (st1 != extent_protocol::OK) { 
+    return IOERR;
+  }
+  return OK;
 }
 
-yfs_client::status yfs_client::lookup(inum parent, const char *name, inum &file_inum) {
+yfs_client::status yfs_client::lookup(inum parent, const char *name, 
+                                      inum &file_inum) {
   jsl_log(JSL_DBG_ME, "yfs_client_lookup %s\n", name);
   std::vector<dirent> content;
   extent_protocol::status st1;
@@ -148,18 +150,20 @@ yfs_client::status yfs_client::lookup(inum parent, const char *name, inum &file_
 }
 
 yfs_client::status yfs_client::read_dir(inum parent, std::vector<dirent> &v) {
- jsl_log(JSL_DBG_ME, "yfs_client_read_dir %016llx\n", parent);
- VERIFY(isdir(parent));  
- std::string buf;
- extent_protocol::status st = ec->get(parent, buf);
- if (st != extent_protocol::OK) {
-  return IOERR;
- }
- deserialize_dir(buf, v);
- return OK;
+  jsl_log(JSL_DBG_ME, "yfs_client_read_dir %016llx\n", parent);
+  VERIFY(isdir(parent));  
+  std::string buf;
+  extent_protocol::status st = ec->get(parent, buf);
+  if (st != extent_protocol::OK) {
+    return IOERR;
+  }
+  jsl_log(JSL_DBG_ME, "yfs_client_read_dir %016llx buf = %s \n", parent, buf.c_str());
+  deserialize_dir(buf, v);
+  return OK;
 }
 
-yfs_client::status yfs_client::read(inum num, size_t size, off_t off, std::string &buf) {
+yfs_client::status yfs_client::read(inum num, size_t size, off_t off, 
+                                    std::string &buf) {
   jsl_log(JSL_DBG_ME, "yfs_client_read %016llx size %lu off %lu\n", num, size, off);
   std::string extent;
   extent_protocol::status st = ec->get(num, extent);
@@ -176,7 +180,8 @@ yfs_client::status yfs_client::read(inum num, size_t size, off_t off, std::strin
   return OK;
 }
 
-yfs_client::status yfs_client::write(inum num, size_t size, off_t off, const char *buf) {
+yfs_client::status yfs_client::write(inum num, size_t size, off_t off, 
+                                     const char *buf) {
   jsl_log(JSL_DBG_ME, "yfs_client_write %016llx\n", num);
   std::string extent;
   if (size == 0) {
@@ -270,18 +275,11 @@ yfs_client::getdir(inum inum, dirinfo &din)
 
 ///// Local methods, don't access the server, stateless
 
-
-bool
-yfs_client::isfile(inum inum)
-{
-  if(inum & 0x80000000)
-    return true;
-  return false;
+bool yfs_client::isfile(inum inum) {
+  return (inum & 0x80000000);
 }
 
-bool
-yfs_client::isdir(inum inum)
-{
+bool yfs_client::isdir(inum inum) {
   return ! isfile(inum);
 }
 
@@ -300,35 +298,29 @@ std::string yfs_client::serialize_dir(std::vector<dirent> dir) {
   return res;
 } 
 
-void yfs_client::deserialize_dir(std::string s, std::vector<dirent> &r){ 
- std::stringstream ss(s);
- std::string item1, item2;
- while (std::getline(ss, item1, '/')) {
+void yfs_client::deserialize_dir(std::string s, std::vector<dirent> &r) { 
+  std::stringstream ss(s);
+  std::string item1, item2;
+  while (std::getline(ss, item1, '/')) {
    VERIFY(std::getline(ss, item2, '/'));
    r.push_back(dirent(item1, n2i(item2)));
  }
 } 
 
-yfs_client::inum
-yfs_client::fresh_inum(bool is_dir)
-{
+yfs_client::inum yfs_client::fresh_inum(bool is_dir) {
   unsigned long int r = rand(); 
   if (!is_dir) { r |= 0x80000000; }
   return (inum) r;
 }
 
-yfs_client::inum
-yfs_client::n2i(std::string n)
-{
+yfs_client::inum yfs_client::n2i(std::string n) {
   std::istringstream ist(n);
   unsigned long long finum;
   ist >> finum;
   return finum;
 }
 
-std::string
-yfs_client::filename(inum inum)
-{
+std::string yfs_client::filename(inum inum) {
   std::ostringstream ost;
   ost << inum;
   return ost.str();

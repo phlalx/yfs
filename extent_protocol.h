@@ -5,11 +5,20 @@
 
 #include "rpc.h"
 
+/** 
+  * Common types for RPC between extent_client and extent_server 
+  */ 
+  
 class extent_protocol {
  public:
   typedef int status;
+
   typedef unsigned long long extentid_t;
+
+  static const extentid_t root_inum = 1L;
+
   enum xxstatus { OK, RPCERR, NOENT, IOERR };
+
   enum rpc_numbers {
     put = 0x6001,
     get,

@@ -1,5 +1,3 @@
-// this is the extent server
-
 #ifndef extent_server_h
 #define extent_server_h
 
@@ -7,8 +5,14 @@
 #include <map>
 #include "extent_protocol.h"
 
+/** 
+  * A simple map from extentid_t ids to extents. 
+  * An extent is a pair (buffer, attribute)
+  * To be used within an RPC server
+  */
 class extent_server {
 
+private:
   pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
   struct Value {
@@ -18,13 +22,13 @@ class extent_server {
 
   std::map<extent_protocol::extentid_t, Value> kv_store; 
 
- public:
+public:
   extent_server();
 
-  int put(extent_protocol::extentid_t id, std::string, int &);
-  int get(extent_protocol::extentid_t id, std::string &);
-  int getattr(extent_protocol::extentid_t id, extent_protocol::attr &);
-  int remove(extent_protocol::extentid_t id, int &);
+  extent_protocol::status put(extent_protocol::extentid_t id, std::string, int &);
+  extent_protocol::status get(extent_protocol::extentid_t id, std::string &);
+  extent_protocol::status getattr(extent_protocol::extentid_t id, extent_protocol::attr &);
+  extent_protocol::status remove(extent_protocol::extentid_t id, int &);
 };
 
 #endif 

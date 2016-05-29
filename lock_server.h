@@ -1,6 +1,3 @@
-// this is the lock server
-// the lock client has a similar interface
-
 #ifndef lock_server_h
 #define lock_server_h
 
@@ -12,6 +9,11 @@
 #include <map>
 #include <vector>
 
+/** 
+  * A simple lock server (Lab 1)
+  * https://pdos.csail.mit.edu/archive/6.824-2012/labs/lab-1.html 
+  * To be used within an RPC server
+  */
 class lock_server {
 
  protected:
@@ -33,7 +35,7 @@ class lock_server {
   pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
- public:
+public:
   lock_server();
   ~lock_server() {};
   lock_protocol::status stat(int clt, lock_protocol::lockid_t lid, int &);

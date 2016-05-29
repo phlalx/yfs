@@ -6,11 +6,10 @@
 #include "extent_server.h"
 #include "jsl_log.h"
 
-// Main loop of extent server
-
-int
-main(int argc, char *argv[])
-{
+/**
+  * main loop of extent server
+  */
+int main(int argc, char *argv[]) {
   jsl_set_debug(JSL_DBG_ME);
   int count = 0;
 
@@ -27,13 +26,13 @@ main(int argc, char *argv[])
   }
 
   rpcs server(atoi(argv[1]), count);
-  extent_server ls;
+  extent_server es;
 
-  server.reg(extent_protocol::get, &ls, &extent_server::get);
-  server.reg(extent_protocol::getattr, &ls, &extent_server::getattr);
-  server.reg(extent_protocol::put, &ls, &extent_server::put);
-  server.reg(extent_protocol::remove, &ls, &extent_server::remove);
+  server.reg(extent_protocol::get, &es, &extent_server::get);
+  server.reg(extent_protocol::getattr, &es, &extent_server::getattr);
+  server.reg(extent_protocol::put, &es, &extent_server::put);
+  server.reg(extent_protocol::remove, &es, &extent_server::remove);
 
-  while(1)
-    sleep(1000);
+  // TODO(phil) change this
+  while(1) sleep(1000);
 }

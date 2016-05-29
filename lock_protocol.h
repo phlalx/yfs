@@ -1,10 +1,12 @@
-// lock protocol
-
 #ifndef lock_protocol_h
 #define lock_protocol_h
 
 #include "rpc.h"
 
+/**
+  * Common types for RPCs between lock_client (or lock_client_cache) 
+  * and lock_server 
+  */
 class lock_protocol {
  public:
   enum xxstatus { OK, RETRY, RPCERR, NOENT, IOERR };
@@ -18,6 +20,9 @@ class lock_protocol {
   };
 };
 
+/**
+  * Common types for RPCs between lock_server and lock_client_cache
+  */
 class rlock_protocol {
  public:
   enum xxstatus { OK, RPCERR };

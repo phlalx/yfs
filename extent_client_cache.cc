@@ -34,8 +34,8 @@ extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid
       return res;
     }
   }
-  // qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
 
+  // TODO(phil) qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
   {
     ScopedLock ml(&mutex_); 
     Value &v = store_[eid];
@@ -49,6 +49,7 @@ extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid
 
 extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t eid, 
                                                      extent_protocol::attr &attr) {
+  // TODO(phil) factorize this 
   extent_protocol::status res = extent_protocol::OK;
   bool found = true;
   {
@@ -70,7 +71,6 @@ extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t
       return res;
     }
   }
-  // qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
 
   {
     ScopedLock ml(&mutex_); 
@@ -93,7 +93,7 @@ extent_protocol::status extent_client_cache::put(extent_protocol::extentid_t eid
   v.dirty = true;
   time_t cur_time = time(NULL);
 
-  // TODO why change ctime at every access?
+  // TODO(phil) why change ctime at every access?
   v.attr.ctime = cur_time;
   v.attr.mtime = cur_time;
   return extent_protocol::OK;
@@ -134,5 +134,3 @@ void extent_client_cache::flush(extent_protocol::extentid_t eid) {
   store_.erase(eid);
   return;
 }
-
-

@@ -6,9 +6,9 @@
 #include "rpc.h"
 
 /**
-  * RPC stub to talk to extent_server
-  * The calls assume that the caller holds a lock on the extent
-  * thread-safe (thanks to rpcc)
+  * RPC stub to talk to the extent_server
+  * Assume that the caller always holds a lock on the extent
+  * Thread-safe (thanks to rpcc)
   */
 class extent_client {
 	
@@ -20,10 +20,13 @@ public:
 
 	extent_protocol::status get(extent_protocol::extentid_t eid, 
 							    std::string &buf);
+
 	extent_protocol::status getattr(extent_protocol::extentid_t eid, 
 		                            extent_protocol::attr &a);
+
 	extent_protocol::status put(extent_protocol::extentid_t eid, 
 		                         std::string buf);
+
 	extent_protocol::status remove(extent_protocol::extentid_t eid);
 };
 

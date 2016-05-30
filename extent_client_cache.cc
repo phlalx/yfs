@@ -1,5 +1,3 @@
-// RPC stubs for clxents to talk to extent_server
-
 #include "extent_client_cache.h"
 #include "extent_client.h"
 #include <sstream>
@@ -10,10 +8,7 @@
 #include <slock.h>
 #include <jsl_log.h>
 
-// The calls assume that the caller holds a lock on the extent
-
-extent_client_cache::extent_client_cache(std::string dst) {
-  ec = new extent_client(dst);
+extent_client_cache::extent_client_cache(const std::string &dst) : extent_client(dst) {
 }
 
 extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid, 
@@ -21,20 +16,20 @@ extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid
   extent_protocol::status res = extent_protocol::OK;
   bool found = true;
   {
-    ScopedLock ml(&mutex); 
+    ScopedLock ml(&mutex_); 
     jsl_log(JSL_DBG_ME, "extent_client_cache: get %lud %llu\n", pthread_self(), eid);
-    if (kv_store.find(eid) == kv_store.end()) {
+    if (store_.find(eid) == store_.end()) {
       found = false;
     }
   }
   Value copy;
-  if (!found) { // not found locally
-    // TODO -> ajouter une opération sur le serveur qui renvoie tout ?
-    res = ec->get(eid, copy.buf); 
+  if (!found) { 
+    // TODO(phil) ajouter une opération sur le serveur qui renvoie tout ?
+    res = extent_client::get(eid, copy.buf); 
     if (res != extent_protocol::OK) {
       return res;
     }
-    res = ec->getattr(eid, copy.attr);
+    res = extent_client::getattr(eid, copy.attr);
     if (res != extent_protocol::OK) {
       return res;
     }
@@ -42,10 +37,10 @@ extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid
   // qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
 
   {
-    ScopedLock ml(&mutex); 
-    Value &v = kv_store[eid];
+    ScopedLock ml(&mutex_); 
+    Value &v = store_[eid];
     if (!found) {
-      kv_store[eid] = copy;
+      store_[eid] = copy;
     }
     buf = v.buf;
   }
@@ -57,20 +52,20 @@ extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t
   extent_protocol::status res = extent_protocol::OK;
   bool found = true;
   {
-    ScopedLock ml(&mutex); 
+    ScopedLock ml(&mutex_); 
     jsl_log(JSL_DBG_ME, "extent_client_cache: getattr %lud %llu\n", pthread_self(), eid);
-    if (kv_store.find(eid) == kv_store.end()) {
+    if (store_.find(eid) == store_.end()) {
       found = false;
     }
   }
   Value copy;
   if (!found) { // not found locally
     // TODO -> ajouter une opération sur le serveur qui renvoie tout ?
-    res = ec->get(eid, copy.buf); 
+    res = extent_client::get(eid, copy.buf); 
     if (res != extent_protocol::OK) {
       return res;
     }
-    res = ec->getattr(eid, copy.attr);
+    res = extent_client::getattr(eid, copy.attr);
     if (res != extent_protocol::OK) {
       return res;
     }
@@ -78,10 +73,10 @@ extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t
   // qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
 
   {
-    ScopedLock ml(&mutex); 
-    Value &v = kv_store[eid];
+    ScopedLock ml(&mutex_); 
+    Value &v = store_[eid];
     if (!found) {
-      kv_store[eid] = copy;
+      store_[eid] = copy;
     }
     attr = v.attr;
   }
@@ -90,9 +85,9 @@ extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t
 
 extent_protocol::status extent_client_cache::put(extent_protocol::extentid_t eid,
                                                  std::string buf) {
-  ScopedLock ml(&mutex);
+  ScopedLock ml(&mutex_);
   jsl_log(JSL_DBG_ME, "extent_client_cache: put %lud %llu\n", pthread_self(), eid);
-  Value &v = kv_store[eid];
+  Value &v = store_[eid];
   v.buf = buf;
   v.attr.size = buf.size();
   v.dirty = true;
@@ -106,37 +101,37 @@ extent_protocol::status extent_client_cache::put(extent_protocol::extentid_t eid
 
 extent_protocol::status extent_client_cache::remove(
     extent_protocol::extentid_t eid) {
-  ScopedLock ml(&mutex);
+  ScopedLock ml(&mutex_);
   jsl_log(JSL_DBG_ME, "extent_client_cache remove %lud %llu\n", pthread_self(), eid);
-  if (kv_store.find(eid) == kv_store.end()) {
+  if (store_.find(eid) == store_.end()) {
     return extent_protocol::NOENT;
   }
-  kv_store.erase(eid);
+  store_.erase(eid);
   return extent_protocol::OK;
 }
 
 void extent_client_cache::flush(extent_protocol::extentid_t eid) {
-  ScopedLock ml(&mutex);
+  ScopedLock ml(&mutex_);
   jsl_log(JSL_DBG_ME, "extent_client_cache: flush %lud %llu %p\n", pthread_self(), eid, this);
   extent_protocol::status res = extent_protocol::OK;
 
-  if (kv_store.find(eid) == kv_store.end()) {
+  if (store_.find(eid) == store_.end()) {
     jsl_log(JSL_DBG_ME, "extent_client_cache: flush - remove %llu\n", eid);
-    res = ec->remove(eid); 
+    res = extent_client::remove(eid); 
     // TODO pas toujours bon... test-lab-3-b 
     VERIFY(res == extent_protocol::OK);
     return;
   }
   
-  Value &v = kv_store[eid];
+  Value &v = store_[eid];
   if (v.dirty) {
     jsl_log(JSL_DBG_ME, "extent_client_cache: flush - write back %llu buf = %s\n ", eid, v.buf.c_str());
     // writeback
-    res = ec->put(eid, v.buf);
+    res = extent_client::put(eid, v.buf);
     VERIFY(res == extent_protocol::OK);
   }
   jsl_log(JSL_DBG_ME, "extent_client_cache: flush - erase %llu\n", eid);
-  kv_store.erase(eid);
+  store_.erase(eid);
   return;
 }
 

@@ -16,7 +16,7 @@ private:
 	rpcc *cl;
 
 public:
-	extent_client(std::string dst);
+	extent_client(const std::string &dst);
 
 	extent_protocol::status get(extent_protocol::extentid_t eid, 
 							    std::string &buf);

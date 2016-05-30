@@ -6,7 +6,7 @@
 #include <time.h>
 #include <jsl_log.h>
 
-extent_client::extent_client(std::string dst) {
+extent_client::extent_client(const std::string &dst) {
   sockaddr_in dstsock;
   make_sockaddr(dst.c_str(), &dstsock);
   cl = new rpcc(dstsock);

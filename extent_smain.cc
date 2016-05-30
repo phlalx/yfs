@@ -7,7 +7,9 @@
 #include "extent_server.h"
 #include "jsl_log.h"
 
-// Main loop of extent server
+/**
+  * main loop of extent server
+  */
 int main(int argc, char *argv[]) {
   jsl_set_debug(JSL_DBG_ME);
   int count = 0;
@@ -32,6 +34,6 @@ int main(int argc, char *argv[]) {
   server.reg(extent_protocol::put, &es, &extent_server::put);
   server.reg(extent_protocol::remove, &es, &extent_server::remove);
 
-  while(1)
-    sleep(1000);
+  // TODO(phil) change this
+  while(1) sleep(1000);
 }

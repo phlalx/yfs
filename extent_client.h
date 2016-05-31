@@ -4,6 +4,7 @@
 #include <string>
 #include "extent_protocol.h"
 #include "rpc.h"
+#include <memory>
 
 /**
   * RPC stub to talk to the extent_server
@@ -13,7 +14,7 @@
 class extent_client {
 	
 private:
-	rpcc *cl;
+	std::unique_ptr<rpcc> cl;
 
 public:
 	extent_client(const std::string &dst);

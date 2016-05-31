@@ -22,7 +22,7 @@ extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid
       found = false;
     }
   }
-  Value copy;
+  Extent copy;
   if (!found) { 
     // TODO(phil) ajouter une opération sur le serveur qui renvoie tout ?
     res = extent_client::get(eid, copy.buf); 
@@ -38,7 +38,7 @@ extent_protocol::status extent_client_cache::get(extent_protocol::extentid_t eid
   // TODO(phil) qu'est ce qui peut arriver quand on n'a pas le verrou ici ?
   {
     ScopedLock ml(&mutex_); 
-    Value &v = store_[eid];
+    Extent &v = store_[eid];
     if (!found) {
       store_[eid] = copy;
     }
@@ -59,7 +59,7 @@ extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t
       found = false;
     }
   }
-  Value copy;
+  Extent copy;
   if (!found) { // not found locally
     // TODO -> ajouter une opération sur le serveur qui renvoie tout ?
     res = extent_client::get(eid, copy.buf); 
@@ -74,7 +74,7 @@ extent_protocol::status extent_client_cache::getattr(extent_protocol::extentid_t
 
   {
     ScopedLock ml(&mutex_); 
-    Value &v = store_[eid];
+    Extent &v = store_[eid];
     if (!found) {
       store_[eid] = copy;
     }
@@ -87,7 +87,7 @@ extent_protocol::status extent_client_cache::put(extent_protocol::extentid_t eid
                                                  std::string buf) {
   ScopedLock ml(&mutex_);
   jsl_log(JSL_DBG_ME, "extent_client_cache: put %lud %llu\n", pthread_self(), eid);
-  Value &v = store_[eid];
+  Extent &v = store_[eid];
   v.buf = buf;
   v.attr.size = buf.size();
   v.dirty = true;
@@ -123,7 +123,7 @@ void extent_client_cache::flush(extent_protocol::extentid_t eid) {
     return;
   }
   
-  Value &v = store_[eid];
+  Extent &v = store_[eid];
   if (v.dirty) {
     jsl_log(JSL_DBG_ME, "extent_client_cache: flush - write back %llu buf = %s\n ", eid, v.buf.c_str());
     // writeback

@@ -9,7 +9,7 @@
 extent_client::extent_client(const std::string &dst) {
   sockaddr_in dstsock;
   make_sockaddr(dst.c_str(), &dstsock);
-  cl = new rpcc(dstsock);
+  cl = std::unique_ptr<rpcc>(new rpcc(dstsock));
   VERIFY(cl->bind() == 0);
 }
 

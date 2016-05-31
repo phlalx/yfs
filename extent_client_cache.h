@@ -17,13 +17,13 @@ class extent_client_cache : extent_client {
 	
 private:
 
-	struct Value {
+	struct Extent {
 		extent_protocol::attr attr;
 		std::string buf;
 		bool dirty;
 	};
 
-	std::map<extent_protocol::extentid_t, Value> store_; 
+	std::map<extent_protocol::extentid_t, Extent> store_; 
 
 	pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
 	

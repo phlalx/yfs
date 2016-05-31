@@ -80,6 +80,7 @@ public:
   status unlink(inum parent, const char *name);
 
   status resize(inum num, size_t size);
+  
 private:
   
   extent_client_cache *ec;

@@ -7,6 +7,7 @@ enum dbcode {
 	JSL_DBG_2 = 2, // Error
 	JSL_DBG_3 = 3, // Info
 	JSL_DBG_4 = 4, // Debugging
+	JSL_DBG_ME = 16, // Debugging
 };
 
 extern int JSL_DEBUG_LEVEL;
